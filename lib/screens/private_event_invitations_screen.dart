@@ -1,0 +1,622 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:ekaadh_mobile/core/theme.dart';
+import 'package:ekaadh_mobile/models/private_event_model.dart';
+import 'package:ekaadh_mobile/services/auth_service.dart';
+import 'package:ekaadh_mobile/services/private_event_service.dart';
+import 'package:ekaadh_mobile/screens/private_event_send_invites_screen.dart';
+import 'package:ekaadh_mobile/widgets/phone_number_field.dart';
+
+class PrivateEventInvitationsScreen extends StatefulWidget {
+  const PrivateEventInvitationsScreen({
+    super.key,
+    required this.auth,
+    required this.eventId,
+  });
+
+  final AuthService auth;
+  final int eventId;
+
+  @override
+  State<PrivateEventInvitationsScreen> createState() =>
+      _PrivateEventInvitationsScreenState();
+}
+
+class _PrivateEventInvitationsScreenState
+    extends State<PrivateEventInvitationsScreen> {
+  late final PrivateEventService _service;
+  final _searchController = TextEditingController();
+  List<InvitationModel> _invites = [];
+  PrivateEventModel? _event;
+  int _remaining = 0;
+  bool _loading = true;
+  String? _error;
+  String _query = '';
+
+  List<InvitationModel> get _filteredInvites {
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return _invites;
+    final digits = q.replaceAll(RegExp(r'\D'), '');
+    return _invites.where((invite) {
+      final name = (invite.guestName ?? '').toLowerCase();
+      final phone = invite.guestPhone.toLowerCase();
+      final phoneDigits = invite.guestPhone.replaceAll(RegExp(r'\D'), '');
+      if (name.contains(q) || phone.contains(q)) return true;
+      if (digits.isNotEmpty && phoneDigits.contains(digits)) return true;
+      return false;
+    }).toList();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _service = PrivateEventService(token: widget.auth.token!);
+    _searchController.addListener(() {
+      setState(() => _query = _searchController.text);
+    });
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final result = await _service.invitations(widget.eventId);
+      if (!mounted) return;
+      setState(() {
+        _invites = result.invitations;
+        _remaining = result.remaining;
+        _event = result.event;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().replaceFirst('Exception: ', '');
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _send() async {
+    final event = _event ?? await _service.show(widget.eventId);
+    if (!mounted) return;
+    final sent = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => PrivateEventSendInvitesScreen(
+          auth: widget.auth,
+          event: event,
+        ),
+      ),
+    );
+    if (sent == true && mounted) _load();
+  }
+
+  Future<void> _resend(InvitationModel invite) async {
+    try {
+      await _service.resendInvitation(
+        eventId: widget.eventId,
+        invitationId: invite.id,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invitation resent')),
+      );
+      _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  Future<void> _revoke(InvitationModel invite) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text(
+          'Revoke invitation?',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
+        content: const Text(
+          'Unused tickets will be cancelled and seats freed.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Revoke',
+              style: TextStyle(color: EkaadhColors.danger),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await _service.revokeInvitation(
+        eventId: widget.eventId,
+        invitationId: invite.id,
+      );
+      _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  Future<void> _editPhone(InvitationModel invite) async {
+    final controller = TextEditingController(
+      text: invite.guestPhone.replaceFirst('+252', ''),
+    );
+    final phone = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text(
+          'Update phone',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
+        content: PhoneNumberField(controller: controller),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Save & resend'),
+          ),
+        ],
+      ),
+    );
+    if (phone == null || phone.isEmpty) return;
+    try {
+      await _service.updatePhone(
+        eventId: widget.eventId,
+        invitationId: invite.id,
+        phone: PhoneNumberField.fullNumber(phone),
+      );
+      _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final event = _event;
+    final thumb = event?.design?.previewImageUrl ?? event?.coverImage;
+    final meta = event == null
+        ? ''
+        : [
+            if (event.eventDateLabel != null) event.eventDateLabel!,
+            if (event.eventTimeLabel != null) event.eventTimeLabel!,
+            if (event.venue != null) event.venue!,
+          ].join(' · ');
+    final filtered = _filteredInvites;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text(
+          'Invitations',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
+        backgroundColor: Colors.white,
+        foregroundColor: EkaadhColors.dark,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _send,
+        backgroundColor: EkaadhColors.brand,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        icon: const Icon(Icons.send_rounded),
+        label: const Text(
+          'Send',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
+      ),
+      body: RefreshIndicator(
+        color: EkaadhColors.brand,
+        onRefresh: _load,
+        child: _loading
+            ? const Center(
+                child: CircularProgressIndicator(color: EkaadhColors.brand),
+              )
+            : _error != null
+                ? ListView(
+                    padding: const EdgeInsets.all(24),
+                    children: [
+                      Text(
+                        _error!,
+                        style: const TextStyle(color: EkaadhColors.danger),
+                      ),
+                    ],
+                  )
+                : ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 110),
+                    children: [
+                      if (event != null)
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: const Color(0xFFEEF0F4)),
+                          ),
+                          child: Row(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: SizedBox(
+                                  width: 52,
+                                  height: 68,
+                                  child: thumb != null
+                                      ? Image.network(
+                                          thumb,
+                                          fit: BoxFit.cover,
+                                        )
+                                      : const ColoredBox(
+                                          color: EkaadhColors.brandLight,
+                                          child: Icon(
+                                            Icons.confirmation_number_outlined,
+                                            color: EkaadhColors.brand,
+                                            size: 22,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      event.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                    if (meta.isNotEmpty) ...[
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        meta,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: EkaadhColors.muted,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      '$_remaining seats remaining',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        color: EkaadhColors.brand,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        Text(
+                          '$_remaining seats remaining',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: EkaadhColors.brand,
+                          ),
+                        ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _searchController,
+                        decoration: EkaadhFields.decoration(
+                          hintText: 'Search by name or phone',
+                          prefixIcon: const Icon(
+                            Icons.search_rounded,
+                            color: EkaadhColors.soft,
+                          ),
+                          suffixIcon: _query.isEmpty
+                              ? null
+                              : IconButton(
+                                  onPressed: () {
+                                    _searchController.clear();
+                                  },
+                                  icon: const Icon(
+                                    Icons.close_rounded,
+                                    color: EkaadhColors.soft,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      if (_invites.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 48),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.mail_outline_rounded,
+                                size: 42,
+                                color: EkaadhColors.soft,
+                              ),
+                              SizedBox(height: 12),
+                              Text(
+                                'No invitations yet',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              SizedBox(height: 6),
+                              Text(
+                                'Tap Send to invite guests by phone.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: EkaadhColors.muted,
+                                  height: 1.45,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else if (filtered.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 40),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.search_off_rounded,
+                                size: 40,
+                                color: EkaadhColors.soft,
+                              ),
+                              SizedBox(height: 10),
+                              Text(
+                                'No guests match your search',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              SizedBox(height: 6),
+                              Text(
+                                'Try another name or phone number.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: EkaadhColors.muted),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        ...filtered.map((invite) => _inviteCard(invite)),
+                    ],
+                  ),
+      ),
+    );
+  }
+
+  String _initial(String? name) {
+    final trimmed = name?.trim() ?? '';
+    if (trimmed.isEmpty) return 'G';
+    return trimmed[0].toUpperCase();
+  }
+
+  Widget _inviteCard(InvitationModel invite) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFEEF0F4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: EkaadhColors.brandLight,
+                child: Text(
+                  _initial(invite.guestName),
+                  style: const TextStyle(
+                    color: EkaadhColors.brand,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      invite.guestName?.isNotEmpty == true
+                          ? invite.guestName!
+                          : 'Guest',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      invite.guestPhone,
+                      style: const TextStyle(
+                        color: EkaadhColors.muted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: invite.isActive
+                      ? const Color(0xFFECFDF5)
+                      : const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  invite.status,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: invite.isActive
+                        ? const Color(0xFF059669)
+                        : EkaadhColors.danger,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '${invite.quantity} × ${invite.ticketTypeName ?? 'Ticket'} · SMS ${invite.smsStatus}',
+            style: const TextStyle(fontSize: 12, color: EkaadhColors.soft),
+          ),
+          if (invite.invitationUrl != null) ...[
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: invite.invitationUrl!));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Invitation link copied')),
+                );
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8F9FC),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.link_rounded,
+                      size: 16,
+                      color: EkaadhColors.brand,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        invite.invitationUrl!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: EkaadhColors.brand,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const Icon(
+                      Icons.copy_rounded,
+                      size: 14,
+                      color: EkaadhColors.soft,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          if (invite.isActive) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _ActionChip(
+                  label: 'Resend',
+                  onTap: () => _resend(invite),
+                ),
+                const SizedBox(width: 6),
+                _ActionChip(
+                  label: 'Phone',
+                  onTap: () => _editPhone(invite),
+                ),
+                const SizedBox(width: 6),
+                _ActionChip(
+                  label: 'Revoke',
+                  danger: true,
+                  onTap: () => _revoke(invite),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionChip extends StatelessWidget {
+  const _ActionChip({
+    required this.label,
+    required this.onTap,
+    this.danger = false,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: danger ? const Color(0xFFFEF2F2) : const Color(0xFFF8F9FC),
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: danger ? EkaadhColors.danger : EkaadhColors.dark,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
