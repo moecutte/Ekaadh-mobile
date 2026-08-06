@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ekaadh_mobile/core/locale_scope.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
 import 'package:ekaadh_mobile/models/private_event_model.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
@@ -6,6 +7,7 @@ import 'package:ekaadh_mobile/services/private_event_service.dart';
 import 'package:ekaadh_mobile/screens/private_event_add_capacity_screen.dart';
 import 'package:ekaadh_mobile/screens/private_event_invitations_screen.dart';
 import 'package:ekaadh_mobile/screens/private_event_pay_screen.dart';
+import 'package:ekaadh_mobile/widgets/design_network_image.dart';
 
 class PrivateEventDetailScreen extends StatefulWidget {
   const PrivateEventDetailScreen({
@@ -69,15 +71,16 @@ class _PrivateEventDetailScreenState extends State<PrivateEventDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
     final e = _event;
     final thumb = e?.design?.previewImageUrl ?? e?.coverImage;
 
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
-          'Ticket details',
-          style: TextStyle(fontWeight: FontWeight.w900),
+        title: Text(
+          l10n.t('ticket_details'),
+          style: const TextStyle(fontWeight: FontWeight.w900),
         ),
         backgroundColor: Colors.white,
         foregroundColor: EkaadhColors.dark,
@@ -89,7 +92,7 @@ class _PrivateEventDetailScreenState extends State<PrivateEventDetailScreen> {
               child: CircularProgressIndicator(color: EkaadhColors.brand),
             )
           : e == null
-              ? Center(child: Text(_error ?? 'Not found'))
+              ? Center(child: Text(_error ?? l10n.t('not_found')))
               : RefreshIndicator(
                   color: EkaadhColors.brand,
                   onRefresh: _load,
@@ -105,7 +108,7 @@ class _PrivateEventDetailScreenState extends State<PrivateEventDetailScreen> {
                               width: 88,
                               height: 118,
                               child: thumb != null
-                                  ? Image.network(thumb, fit: BoxFit.cover)
+                                  ? DesignNetworkImage(url: thumb)
                                   : const ColoredBox(
                                       color: EkaadhColors.brandLight,
                                       child: Icon(
@@ -130,9 +133,9 @@ class _PrivateEventDetailScreenState extends State<PrivateEventDetailScreen> {
                                     color: const Color(0xFFECFDF5),
                                     borderRadius: BorderRadius.circular(999),
                                   ),
-                                  child: const Text(
-                                    'Paid',
-                                    style: TextStyle(
+                                  child: Text(
+                                    l10n.t('paid'),
+                                    style: const TextStyle(
                                       color: Color(0xFF047857),
                                       fontSize: 10,
                                       fontWeight: FontWeight.w800,
@@ -172,11 +175,11 @@ class _PrivateEventDetailScreenState extends State<PrivateEventDetailScreen> {
                       const SizedBox(height: 22),
                       Row(
                         children: [
-                          _stat('Paid seats', '${e.capacity}'),
+                          _stat(l10n.t('paid_seats'), '${e.capacity}'),
                           const SizedBox(width: 10),
-                          _stat('Invited', '${e.invited}'),
+                          _stat(l10n.t('invited'), '${e.invited}'),
                           const SizedBox(width: 10),
-                          _stat('Left', '${e.remaining}'),
+                          _stat(l10n.t('left'), '${e.remaining}'),
                         ],
                       ),
                       const SizedBox(height: 22),
@@ -201,7 +204,7 @@ class _PrivateEventDetailScreenState extends State<PrivateEventDetailScreen> {
                           textStyle:
                               const TextStyle(fontWeight: FontWeight.w800),
                         ),
-                        child: const Text('Manage invitations'),
+                        child: Text(l10n.t('manage_invitations')),
                       ),
                       const SizedBox(height: 10),
                       OutlinedButton(
@@ -229,14 +232,14 @@ class _PrivateEventDetailScreenState extends State<PrivateEventDetailScreen> {
                           textStyle:
                               const TextStyle(fontWeight: FontWeight.w800),
                         ),
-                        child: const Text('Buy more tickets'),
+                        child: Text(l10n.t('buy_more_tickets')),
                       ),
                       if (e.description != null &&
                           e.description!.isNotEmpty) ...[
                         const SizedBox(height: 22),
-                        const Text(
-                          'About',
-                          style: TextStyle(
+                        Text(
+                          l10n.t('about'),
+                          style: const TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 15,
                           ),

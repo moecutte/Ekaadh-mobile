@@ -1,42 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
+import 'package:ekaadh_mobile/core/locale_scope.dart';
 import 'package:ekaadh_mobile/widgets/ekaadh_logo.dart';
 
 class _OnboardingSlide {
   const _OnboardingSlide({
     required this.emoji,
     required this.background,
-    required this.title,
-    required this.body,
+    required this.titleKey,
+    required this.bodyKey,
   });
 
   final String emoji;
   final Color background;
-  final String title;
-  final String body;
+  final String titleKey;
+  final String bodyKey;
 }
 
 const _slides = [
   _OnboardingSlide(
     emoji: '🎪',
     background: EkaadhColors.brandLight,
-    title: 'Discover Amazing Events',
-    body:
-        'Browse concerts, sports, food festivals, and more happening near you — all in one place.',
+    titleKey: 'onboard_1_title',
+    bodyKey: 'onboard_1_body',
   ),
   _OnboardingSlide(
     emoji: '⚡',
     background: Color(0xFFEFF0FE),
-    title: 'Buy Tickets in Seconds',
-    body:
-        'Select your seats, choose Zaad or eDahab, and pay instantly. No cash, no queues.',
+    titleKey: 'onboard_2_title',
+    bodyKey: 'onboard_2_body',
   ),
   _OnboardingSlide(
     emoji: '📱',
     background: Color(0xFFFFFBEB),
-    title: 'Your Ticket, Always Ready',
-    body:
-        'Your QR-code tickets live in the app. Show them at the door — no printing needed.',
+    titleKey: 'onboard_3_title',
+    bodyKey: 'onboard_3_body',
   ),
 ];
 
@@ -64,6 +62,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
     final s = _slides[_slide];
 
     return Scaffold(
@@ -72,21 +71,46 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
-                child: TextButton(
-                  onPressed: widget.onComplete,
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFFB8BFBB),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+              child: Row(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: EkaadhColors.surface,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFE2E8E4)),
+                    ),
+                    padding: const EdgeInsets.all(2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _OnboardLangChip(
+                          label: l10n.t('eng'),
+                          selected: l10n.code == 'en',
+                          onTap: () => l10n.setLocale('en'),
+                        ),
+                        _OnboardLangChip(
+                          label: l10n.t('som'),
+                          selected: l10n.code == 'so',
+                          onTap: () => l10n.setLocale('so'),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: const Text(
-                    'Skip',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: widget.onComplete,
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFFB8BFBB),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    ),
+                    child: Text(
+                      l10n.t('skip'),
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
             const Padding(
@@ -128,7 +152,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    s.title,
+                    l10n.t(s.titleKey),
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w900,
@@ -138,7 +162,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    s.body,
+                    l10n.t(s.bodyKey),
                     style: const TextStyle(
                       color: Color(0xFF6B7A72),
                       fontSize: 15,
@@ -167,7 +191,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        _isLast ? 'Get Started' : 'Next',
+                        _isLast ? l10n.t('get_started') : l10n.t('next'),
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
@@ -181,6 +205,41 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OnboardLangChip extends StatelessWidget {
+  const _OnboardLangChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? EkaadhColors.brand : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            color: selected ? Colors.white : EkaadhColors.muted,
+          ),
         ),
       ),
     );

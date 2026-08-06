@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1041974530298",
+    "project_id": "ekaadh-71c90",
+    "storage_bucket": "ekaadh-71c90.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1041974530298:android:19a08f42603cd160a4b943",
+        "android_client_info": {
+          "package_name": "com.ekaadh.ekaadh_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDdzFV9IlyJlKUHxWSw6IP0ixi9YE5ahag"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

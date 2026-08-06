@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:ekaadh_mobile/core/locale_scope.dart';
 import 'package:flutter/services.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
 import 'package:ekaadh_mobile/models/private_event_model.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/services/private_event_service.dart';
 import 'package:ekaadh_mobile/screens/private_event_send_invites_screen.dart';
+import 'package:ekaadh_mobile/widgets/design_network_image.dart';
 import 'package:ekaadh_mobile/widgets/phone_number_field.dart';
 
 class PrivateEventInvitationsScreen extends StatefulWidget {
@@ -108,7 +110,7 @@ class _PrivateEventInvitationsScreenState
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invitation resent')),
+        SnackBar(content: Text(LocaleScope.of(context).t('invitation_resent'))),
       );
       _load();
     } catch (e) {
@@ -122,30 +124,31 @@ class _PrivateEventInvitationsScreenState
   Future<void> _revoke(InvitationModel invite) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text(
-          'Revoke invitation?',
-          style: TextStyle(fontWeight: FontWeight.w900),
-        ),
-        content: const Text(
-          'Unused tickets will be cancelled and seats freed.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+      builder: (ctx) {
+        final l10n = LocaleScope.of(ctx);
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: Text(
+            l10n.t('revoke_invitation'),
+            style: const TextStyle(fontWeight: FontWeight.w900),
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(
-              'Revoke',
-              style: TextStyle(color: EkaadhColors.danger),
+          content: Text(l10n.t('revoke_confirm')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n.t('cancel')),
             ),
-          ),
-        ],
-      ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(
+                l10n.t('revoke'),
+                style: const TextStyle(color: EkaadhColors.danger),
+              ),
+            ),
+          ],
+        );
+      },
     );
     if (ok != true) return;
     try {
@@ -168,25 +171,28 @@ class _PrivateEventInvitationsScreenState
     );
     final phone = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text(
-          'Update phone',
-          style: TextStyle(fontWeight: FontWeight.w900),
-        ),
-        content: PhoneNumberField(controller: controller),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+      builder: (ctx) {
+        final l10n = LocaleScope.of(ctx);
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: Text(
+            l10n.t('update_phone'),
+            style: const TextStyle(fontWeight: FontWeight.w900),
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('Save & resend'),
-          ),
-        ],
-      ),
+          content: PhoneNumberField(controller: controller),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(l10n.t('cancel')),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+              child: Text(l10n.t('save_resend')),
+            ),
+          ],
+        );
+      },
     );
     if (phone == null || phone.isEmpty) return;
     try {
@@ -206,6 +212,7 @@ class _PrivateEventInvitationsScreenState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
     final event = _event;
     final thumb = event?.design?.previewImageUrl ?? event?.coverImage;
     final meta = event == null
@@ -220,9 +227,9 @@ class _PrivateEventInvitationsScreenState
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
-          'Invitations',
-          style: TextStyle(fontWeight: FontWeight.w900),
+        title: Text(
+          l10n.t('invitations'),
+          style: const TextStyle(fontWeight: FontWeight.w900),
         ),
         backgroundColor: Colors.white,
         foregroundColor: EkaadhColors.dark,
@@ -235,9 +242,9 @@ class _PrivateEventInvitationsScreenState
         foregroundColor: Colors.white,
         elevation: 0,
         icon: const Icon(Icons.send_rounded),
-        label: const Text(
-          'Send',
-          style: TextStyle(fontWeight: FontWeight.w800),
+        label: Text(
+          l10n.t('send'),
+          style: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
       body: RefreshIndicator(
@@ -275,10 +282,7 @@ class _PrivateEventInvitationsScreenState
                                   width: 52,
                                   height: 68,
                                   child: thumb != null
-                                      ? Image.network(
-                                          thumb,
-                                          fit: BoxFit.cover,
-                                        )
+                                      ? DesignNetworkImage(url: thumb)
                                       : const ColoredBox(
                                           color: EkaadhColors.brandLight,
                                           child: Icon(
@@ -342,7 +346,7 @@ class _PrivateEventInvitationsScreenState
                       TextField(
                         controller: _searchController,
                         decoration: EkaadhFields.decoration(
-                          hintText: 'Search by name or phone',
+                          hintText: l10n.t('search_name_phone'),
                           prefixIcon: const Icon(
                             Icons.search_rounded,
                             color: EkaadhColors.soft,
@@ -362,28 +366,28 @@ class _PrivateEventInvitationsScreenState
                       ),
                       const SizedBox(height: 14),
                       if (_invites.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 48),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 48),
                           child: Column(
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.mail_outline_rounded,
                                 size: 42,
                                 color: EkaadhColors.soft,
                               ),
-                              SizedBox(height: 12),
+                              const SizedBox(height: 12),
                               Text(
-                                'No invitations yet',
-                                style: TextStyle(
+                                l10n.t('no_invitations_yet'),
+                                style: const TextStyle(
                                   fontWeight: FontWeight.w900,
                                   fontSize: 16,
                                 ),
                               ),
-                              SizedBox(height: 6),
+                              const SizedBox(height: 6),
                               Text(
-                                'Tap Send to invite guests by phone.',
+                                l10n.t('tap_send_invite'),
                                 textAlign: TextAlign.center,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   color: EkaadhColors.muted,
                                   height: 1.45,
                                 ),
@@ -392,29 +396,29 @@ class _PrivateEventInvitationsScreenState
                           ),
                         )
                       else if (filtered.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 40),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 40),
                           child: Column(
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.search_off_rounded,
                                 size: 40,
                                 color: EkaadhColors.soft,
                               ),
-                              SizedBox(height: 10),
+                              const SizedBox(height: 10),
                               Text(
-                                'No guests match your search',
+                                l10n.t('no_guests_match'),
                                 textAlign: TextAlign.center,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontWeight: FontWeight.w800,
                                   fontSize: 15,
                                 ),
                               ),
-                              SizedBox(height: 6),
+                              const SizedBox(height: 6),
                               Text(
-                                'Try another name or phone number.',
+                                l10n.t('try_another_name_phone'),
                                 textAlign: TextAlign.center,
-                                style: TextStyle(color: EkaadhColors.muted),
+                                style: const TextStyle(color: EkaadhColors.muted),
                               ),
                             ],
                           ),
@@ -434,6 +438,7 @@ class _PrivateEventInvitationsScreenState
   }
 
   Widget _inviteCard(InvitationModel invite) {
+    final l10n = LocaleScope.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -466,7 +471,7 @@ class _PrivateEventInvitationsScreenState
                     Text(
                       invite.guestName?.isNotEmpty == true
                           ? invite.guestName!
-                          : 'Guest',
+                          : l10n.t('guest'),
                       style: const TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 15,
@@ -507,7 +512,7 @@ class _PrivateEventInvitationsScreenState
           ),
           const SizedBox(height: 10),
           Text(
-            '${invite.quantity} × ${invite.ticketTypeName ?? 'Ticket'} · SMS ${invite.smsStatus}',
+            '${invite.quantity} × ${invite.ticketTypeName ?? l10n.t('ticket_singular')} · SMS ${invite.smsStatus}',
             style: const TextStyle(fontSize: 12, color: EkaadhColors.soft),
           ),
           if (invite.invitationUrl != null) ...[
@@ -516,7 +521,7 @@ class _PrivateEventInvitationsScreenState
               onTap: () {
                 Clipboard.setData(ClipboardData(text: invite.invitationUrl!));
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Invitation link copied')),
+                  SnackBar(content: Text(l10n.t('invitation_link_copied'))),
                 );
               },
               borderRadius: BorderRadius.circular(10),
@@ -563,17 +568,17 @@ class _PrivateEventInvitationsScreenState
             Row(
               children: [
                 _ActionChip(
-                  label: 'Resend',
+                  label: l10n.t('resend'),
                   onTap: () => _resend(invite),
                 ),
                 const SizedBox(width: 6),
                 _ActionChip(
-                  label: 'Phone',
+                  label: l10n.t('phone'),
                   onTap: () => _editPhone(invite),
                 ),
                 const SizedBox(width: 6),
                 _ActionChip(
-                  label: 'Revoke',
+                  label: l10n.t('revoke'),
                   danger: true,
                   onTap: () => _revoke(invite),
                 ),

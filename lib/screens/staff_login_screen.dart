@@ -19,8 +19,8 @@ class StaffLoginScreen extends StatefulWidget {
 }
 
 class _StaffLoginScreenState extends State<StaffLoginScreen> {
-  final _loginController = TextEditingController(text: 'staff@ekaadh.com');
-  final _passwordController = TextEditingController(text: 'password');
+  final _loginController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _loading = false;
   String? _error;
 
@@ -128,14 +128,22 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
                     backgroundColor: EkaadhColors.brand,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 17),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                    textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    textStyle: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                    ),
                   ),
                   child: _loading
                       ? const SizedBox(
                           width: 22,
                           height: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         )
                       : const Text('Enter scanner'),
                 ),
@@ -179,11 +187,7 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
 
 /// Thin wrapper used after staff login from root.
 class StaffHome extends StatelessWidget {
-  const StaffHome({
-    super.key,
-    required this.auth,
-    required this.onSignOut,
-  });
+  const StaffHome({super.key, required this.auth, required this.onSignOut});
 
   final AuthService auth;
   final Future<void> Function() onSignOut;

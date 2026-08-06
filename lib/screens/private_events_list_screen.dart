@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ekaadh_mobile/core/locale_scope.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
 import 'package:ekaadh_mobile/models/private_event_model.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
@@ -78,10 +79,11 @@ class _PrivateEventsListScreenState extends State<PrivateEventsListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
     return Scaffold(
       backgroundColor: EkaadhColors.surface,
       appBar: AppBar(
-        title: const Text('Private Events', style: TextStyle(fontWeight: FontWeight.w900)),
+        title: Text(l10n.t('private_events'), style: const TextStyle(fontWeight: FontWeight.w900)),
         backgroundColor: Colors.white,
         foregroundColor: EkaadhColors.dark,
         elevation: 0,
@@ -91,7 +93,7 @@ class _PrivateEventsListScreenState extends State<PrivateEventsListScreen> {
         backgroundColor: EkaadhColors.brand,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
-        label: const Text('Create', style: TextStyle(fontWeight: FontWeight.w800)),
+        label: Text(l10n.t('create'), style: const TextStyle(fontWeight: FontWeight.w800)),
       ),
       body: RefreshIndicator(
         color: EkaadhColors.brand,
@@ -107,19 +109,19 @@ class _PrivateEventsListScreenState extends State<PrivateEventsListScreen> {
                       FilledButton(
                         onPressed: _load,
                         style: FilledButton.styleFrom(backgroundColor: EkaadhColors.brand),
-                        child: const Text('Retry'),
+                        child: Text(l10n.t('retry')),
                       ),
                     ],
                   )
                 : _events.isEmpty
                     ? ListView(
                         padding: const EdgeInsets.all(24),
-                        children: const [
-                          SizedBox(height: 80),
+                        children: [
+                          const SizedBox(height: 80),
                           Text(
-                            'No private events yet.\nPay for tickets, then invite guests by phone.',
+                            l10n.t('no_private_events'),
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: EkaadhColors.muted, height: 1.5),
+                            style: const TextStyle(color: EkaadhColors.muted, height: 1.5),
                           ),
                         ],
                       )
@@ -178,8 +180,8 @@ class _PrivateEventsListScreenState extends State<PrivateEventsListScreen> {
                                         const SizedBox(height: 8),
                                         Text(
                                           e.isPaid
-                                              ? '${e.invited}/${e.capacity} invited · ${e.remaining} left'
-                                              : 'Awaiting payment',
+                                              ? '${e.invited}/${e.capacity} ${l10n.t('invited_of')} · ${e.remaining} ${l10n.t('seats_left')}'
+                                              : l10n.t('awaiting_payment'),
                                           style: TextStyle(
                                             color: e.isPaid
                                                 ? EkaadhColors.brand

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:ekaadh_mobile/core/locale_scope.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
 import 'package:ekaadh_mobile/models/private_event_model.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/services/private_event_service.dart';
+import 'package:ekaadh_mobile/widgets/design_network_image.dart';
 import 'package:ekaadh_mobile/widgets/phone_number_field.dart';
 
 class _GuestRow {
@@ -74,15 +76,16 @@ class _PrivateEventSendInvitesScreenState
   }
 
   Future<void> _submit() async {
+    final l10n = LocaleScope.of(context);
     final guests = <Map<String, dynamic>>[];
     for (var i = 0; i < _rows.length; i++) {
       final row = _rows[i];
       if (!PhoneNumberField.hasLocalNumber(row.phone.text)) {
-        setState(() => _error = 'Guest ${i + 1}: enter a phone number.');
+        setState(() => _error = '${l10n.t('guest_n')} ${i + 1}: ${l10n.t('guest_enter_phone')}');
         return;
       }
       if (row.ticketTypeId == 0) {
-        setState(() => _error = 'Guest ${i + 1}: select a ticket type.');
+        setState(() => _error = '${l10n.t('guest_n')} ${i + 1}: ${l10n.t('guest_select_type')}');
         return;
       }
       guests.add({
@@ -104,8 +107,9 @@ class _PrivateEventSendInvitesScreenState
         guests: guests,
       );
       if (!mounted) return;
+      final l10n = LocaleScope.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sent $created invitation(s)')),
+        SnackBar(content: Text('${l10n.t('sent_invitations')} $created ${l10n.t('invitations_count')}')),
       );
       Navigator.of(context).pop(true);
     } catch (e) {
@@ -119,6 +123,7 @@ class _PrivateEventSendInvitesScreenState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
     final meta = [
       if (widget.event.eventDateLabel != null) widget.event.eventDateLabel!,
       if (widget.event.eventTimeLabel != null) widget.event.eventTimeLabel!,
@@ -128,9 +133,9 @@ class _PrivateEventSendInvitesScreenState
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
-          'Send invitations',
-          style: TextStyle(fontWeight: FontWeight.w900),
+        title: Text(
+          l10n.t('send_invitations'),
+          style: const TextStyle(fontWeight: FontWeight.w900),
         ),
         backgroundColor: Colors.white,
         foregroundColor: EkaadhColors.dark,
@@ -154,7 +159,7 @@ class _PrivateEventSendInvitesScreenState
                     width: 52,
                     height: 68,
                     child: _thumb != null
-                        ? Image.network(_thumb!, fit: BoxFit.cover)
+                        ? DesignNetworkImage(url: _thumb)
                         : const ColoredBox(
                             color: EkaadhColors.brandLight,
                             child: Icon(
@@ -193,7 +198,7 @@ class _PrivateEventSendInvitesScreenState
                       ],
                       const SizedBox(height: 6),
                       Text(
-                        '${widget.event.remaining} seats remaining',
+                        '${widget.event.remaining} ${l10n.t('seats_remaining')}',
                         style: const TextStyle(
                           fontWeight: FontWeight.w800,
                           color: EkaadhColors.brand,
@@ -207,9 +212,9 @@ class _PrivateEventSendInvitesScreenState
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
-            'Guests get one invitation link plus per-ticket links.',
-            style: TextStyle(
+          Text(
+            l10n.t('guests_link_note'),
+            style: const TextStyle(
               color: EkaadhColors.muted,
               fontSize: 13,
               height: 1.4,
@@ -220,7 +225,7 @@ class _PrivateEventSendInvitesScreenState
           OutlinedButton.icon(
             onPressed: _addRow,
             icon: const Icon(Icons.add_rounded, size: 18),
-            label: const Text('Add guest'),
+            label: Text(l10n.t('add_guest')),
             style: OutlinedButton.styleFrom(
               foregroundColor: EkaadhColors.brand,
               side: const BorderSide(color: Color(0xFFD5DAE8)),
@@ -270,7 +275,7 @@ class _PrivateEventSendInvitesScreenState
                       color: Colors.white,
                     ),
                   )
-                : const Text('Issue & send'),
+                : Text(l10n.t('issue_send')),
           ),
         ],
       ),
@@ -278,6 +283,7 @@ class _PrivateEventSendInvitesScreenState
   }
 
   Widget _guestCard(int index) {
+    final l10n = LocaleScope.of(context);
     final row = _rows[index];
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -311,7 +317,7 @@ class _PrivateEventSendInvitesScreenState
               ),
               const SizedBox(width: 8),
               Text(
-                'Guest ${index + 1}',
+                '${l10n.t('guest_n')} ${index + 1}',
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
               const Spacer(),
@@ -327,7 +333,7 @@ class _PrivateEventSendInvitesScreenState
           const SizedBox(height: 10),
           TextField(
             controller: row.name,
-            decoration: EkaadhFields.decoration(hintText: 'Name (optional)'),
+            decoration: EkaadhFields.decoration(hintText: l10n.t('name_optional')),
           ),
           const SizedBox(height: 10),
           PhoneNumberField(controller: row.phone),
@@ -341,7 +347,7 @@ class _PrivateEventSendInvitesScreenState
                           widget.event.ticketTypes.isNotEmpty
                       ? widget.event.ticketTypes.first.id
                       : row.ticketTypeId,
-                  decoration: EkaadhFields.decoration(hintText: 'Type'),
+                  decoration: EkaadhFields.decoration(hintText: l10n.t('type')),
                   items: widget.event.ticketTypes
                       .map(
                         (t) => DropdownMenuItem(
@@ -360,7 +366,7 @@ class _PrivateEventSendInvitesScreenState
                 width: 72,
                 child: TextFormField(
                   initialValue: '${row.quantity}',
-                  decoration: EkaadhFields.decoration(hintText: 'Qty'),
+                  decoration: EkaadhFields.decoration(hintText: l10n.t('qty')),
                   keyboardType: TextInputType.number,
                   onChanged: (v) {
                     final n = int.tryParse(v) ?? 1;

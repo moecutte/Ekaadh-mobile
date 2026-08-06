@@ -1,3 +1,5 @@
+import 'package:ekaadh_mobile/core/media_url.dart';
+
 class TicketTypeModel {
   final int id;
   final String name;
@@ -85,7 +87,7 @@ class EventModel {
       eventMonth: json['event_month'] as String?,
       eventDay: json['event_day'] as String?,
       eventTimeLabel: json['event_time_label'] as String?,
-      coverImage: json['cover_image'] as String?,
+      coverImage: MediaUrl.resolve(json['cover_image'] as String?),
       isFeatured: json['is_featured'] as bool? ?? false,
       startingPrice: json['starting_price'] == null
           ? null

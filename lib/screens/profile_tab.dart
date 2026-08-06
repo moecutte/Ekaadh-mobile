@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
+import 'package:ekaadh_mobile/core/locale_scope.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
+import 'package:ekaadh_mobile/screens/support_screen.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({
@@ -27,6 +29,7 @@ class ProfileTab extends StatefulWidget {
 class _ProfileTabState extends State<ProfileTab> {
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
     final user = widget.auth.user;
     final signedIn = widget.auth.token != null && user != null;
 
@@ -36,74 +39,94 @@ class _ProfileTabState extends State<ProfileTab> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
           children: [
-            const Text(
-              'Profile',
-              style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
+            Text(
+              l10n.t('profile'),
+              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 20),
             _HeroCard(
               initial: signedIn && user.name.isNotEmpty
                   ? user.name[0].toUpperCase()
                   : 'G',
-              title: signedIn ? user.name : 'Guest',
+              title: signedIn ? user.name : l10n.t('guest'),
               subtitle: signedIn
                   ? (user.phone ?? user.email)
-                  : 'Browse and buy without an account',
+                  : l10n.t('guest_browse'),
+            ),
+            const SizedBox(height: 28),
+            _SectionLabel(l10n.t('preferences')),
+            const SizedBox(height: 8),
+            _SettingsGroup(
+              children: [
+                _LanguageToggle(
+                  code: l10n.code,
+                  label: l10n.t('language'),
+                  engLabel: l10n.t('eng'),
+                  somLabel: l10n.t('som'),
+                  onSelect: l10n.setLocale,
+                ),
+                _SettingsTile(
+                  icon: Icons.chat_bubble_outline,
+                  title: l10n.t('support'),
+                  subtitle: l10n.t('support_sub'),
+                  onTap: () => _openSupport(context),
+                ),
+              ],
             ),
             if (signedIn) ...[
-              const SizedBox(height: 28),
-              const _SectionLabel('Account'),
+              const SizedBox(height: 24),
+              _SectionLabel(l10n.t('account')),
               const SizedBox(height: 8),
               _SettingsGroup(
                 children: [
                   _SettingsTile(
                     icon: Icons.badge_outlined,
-                    title: 'Display name',
+                    title: l10n.t('display_name'),
                     subtitle: user.name,
                     onTap: () => _editName(user.name),
                   ),
                   _SettingsTile(
                     icon: Icons.phone_outlined,
-                    title: 'Phone',
-                    subtitle: user.phone ?? 'Not set',
+                    title: l10n.t('phone'),
+                    subtitle: user.phone ?? l10n.t('not_set'),
                     showChevron: false,
                   ),
                   _SettingsTile(
                     icon: Icons.mail_outline,
-                    title: 'Email',
-                    subtitle: _displayEmail(user.email),
+                    title: l10n.t('email'),
+                    subtitle: _displayEmail(user.email, l10n.t('not_set')),
                     onTap: () => _editEmail(user.email),
                   ),
                 ],
               ),
               const SizedBox(height: 24),
-              const _SectionLabel('Security'),
+              _SectionLabel(l10n.t('security')),
               const SizedBox(height: 8),
               _SettingsGroup(
                 children: [
                   _SettingsTile(
                     icon: Icons.lock_outline,
-                    title: 'Change password',
-                    subtitle: 'Update your sign-in password',
+                    title: l10n.t('change_password'),
+                    subtitle: l10n.t('change_password_sub'),
                     onTap: _changePasswordSheet,
                   ),
                 ],
               ),
               const SizedBox(height: 24),
-              const _SectionLabel('Your activity'),
+              _SectionLabel(l10n.t('your_activity')),
               const SizedBox(height: 8),
               _SettingsGroup(
                 children: [
                   _SettingsTile(
                     icon: Icons.event_available_outlined,
-                    title: 'Booked Events',
-                    subtitle: 'Tickets you purchased',
+                    title: l10n.t('booked_events'),
+                    subtitle: l10n.t('booked_events_sub'),
                     onTap: widget.onOpenBooked,
                   ),
                   _SettingsTile(
                     icon: Icons.confirmation_number_outlined,
-                    title: 'Tickets',
-                    subtitle: 'Private invitations you created',
+                    title: l10n.t('tickets'),
+                    subtitle: l10n.t('tickets_sub'),
                     onTap: widget.onOpenTickets,
                   ),
                 ],
@@ -125,14 +148,14 @@ class _ProfileTabState extends State<ProfileTab> {
                       fontSize: 15,
                     ),
                   ),
-                  child: const Text('Sign out'),
+                  child: Text(l10n.t('sign_out')),
                 ),
               ),
             ] else ...[
               const SizedBox(height: 32),
-              const Text(
-                'Sign in to manage your account, booked events, and private tickets.',
-                style: TextStyle(color: EkaadhColors.muted, height: 1.45),
+              Text(
+                l10n.t('sign_in_prompt'),
+                style: const TextStyle(color: EkaadhColors.muted, height: 1.45),
               ),
               const SizedBox(height: 24),
               FilledButton(
@@ -149,7 +172,7 @@ class _ProfileTabState extends State<ProfileTab> {
                     fontSize: 15,
                   ),
                 ),
-                child: const Text('Sign in'),
+                child: Text(l10n.t('sign_in')),
               ),
               const SizedBox(height: 12),
               OutlinedButton(
@@ -166,7 +189,7 @@ class _ProfileTabState extends State<ProfileTab> {
                     fontSize: 15,
                   ),
                 ),
-                child: const Text('Create account'),
+                child: Text(l10n.t('create_account')),
               ),
             ],
           ],
@@ -175,9 +198,17 @@ class _ProfileTabState extends State<ProfileTab> {
     );
   }
 
-  String _displayEmail(String email) {
-    if (email.endsWith('@ekaadh.local')) return 'Not set';
+  String _displayEmail(String email, String notSet) {
+    if (email.endsWith('@ekaadh.local')) return notSet;
     return email;
+  }
+
+  Future<void> _openSupport(BuildContext context) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SupportScreen(auth: widget.auth),
+      ),
+    );
   }
 
   Future<void> _editName(String current) async {
@@ -216,21 +247,21 @@ class _ProfileTabState extends State<ProfileTab> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Display name',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                  Text(
+                    LocaleScope.of(ctx).t('display_name'),
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
                   ),
                   const SizedBox(height: 6),
-                  const Text(
-                    'This name appears on your account and bookings.',
-                    style: TextStyle(color: EkaadhColors.muted, fontSize: 13),
+                  Text(
+                    LocaleScope.of(ctx).t('display_name_hint'),
+                    style: const TextStyle(color: EkaadhColors.muted, fontSize: 13),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: controller,
                     autofocus: true,
                     textCapitalization: TextCapitalization.words,
-                    decoration: EkaadhFields.decoration(hintText: 'Your name'),
+                    decoration: EkaadhFields.decoration(hintText: LocaleScope.of(ctx).t('your_name')),
                   ),
                   if (error != null) ...[
                     const SizedBox(height: 10),
@@ -245,7 +276,7 @@ class _ProfileTabState extends State<ProfileTab> {
                           : () async {
                               final name = controller.text.trim();
                               if (name.isEmpty) {
-                                setModal(() => error = 'Enter your name.');
+                                setModal(() => error = LocaleScope.of(ctx).t('enter_your_name'));
                                 return;
                               }
                               setModal(() {
@@ -279,9 +310,9 @@ class _ProfileTabState extends State<ProfileTab> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Text(
-                              'Save',
-                              style: TextStyle(fontWeight: FontWeight.w800),
+                          : Text(
+                              LocaleScope.of(ctx).t('save'),
+                              style: const TextStyle(fontWeight: FontWeight.w800),
                             ),
                     ),
                   ),
@@ -333,21 +364,21 @@ class _ProfileTabState extends State<ProfileTab> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Email',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                  Text(
+                    LocaleScope.of(ctx).t('email'),
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
                   ),
                   const SizedBox(height: 6),
-                  const Text(
-                    'Optional. Used for receipts and account recovery.',
-                    style: TextStyle(color: EkaadhColors.muted, fontSize: 13),
+                  Text(
+                    LocaleScope.of(ctx).t('email_hint_sub'),
+                    style: const TextStyle(color: EkaadhColors.muted, fontSize: 13),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: controller,
                     autofocus: true,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: EkaadhFields.decoration(hintText: 'you@example.com'),
+                    decoration: EkaadhFields.decoration(hintText: LocaleScope.of(ctx).t('email_hint')),
                   ),
                   if (error != null) ...[
                     const SizedBox(height: 10),
@@ -396,9 +427,9 @@ class _ProfileTabState extends State<ProfileTab> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Text(
-                              'Save',
-                              style: TextStyle(fontWeight: FontWeight.w800),
+                          : Text(
+                              LocaleScope.of(ctx).t('save'),
+                              style: const TextStyle(fontWeight: FontWeight.w800),
                             ),
                     ),
                   ),
@@ -452,29 +483,29 @@ class _ProfileTabState extends State<ProfileTab> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Change password',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                  Text(
+                    LocaleScope.of(ctx).t('change_password'),
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: current,
                     obscureText: true,
-                    decoration: EkaadhFields.decoration(hintText: 'Current password'),
+                    decoration: EkaadhFields.decoration(hintText: LocaleScope.of(ctx).t('current_password')),
                   ),
                   const SizedBox(height: 10),
                   TextField(
                     controller: next,
                     obscureText: true,
                     decoration:
-                        EkaadhFields.decoration(hintText: 'New password (min. 8)'),
+                        EkaadhFields.decoration(hintText: LocaleScope.of(ctx).t('new_password_hint')),
                   ),
                   const SizedBox(height: 10),
                   TextField(
                     controller: confirm,
                     obscureText: true,
                     decoration:
-                        EkaadhFields.decoration(hintText: 'Confirm new password'),
+                        EkaadhFields.decoration(hintText: LocaleScope.of(ctx).t('confirm_new_password')),
                   ),
                   if (error != null) ...[
                     const SizedBox(height: 10),
@@ -497,16 +528,16 @@ class _ProfileTabState extends State<ProfileTab> {
                       onPressed: saving
                           ? null
                           : () async {
+                              final sheetL10n = LocaleScope.of(ctx);
                               if (current.text.isEmpty ||
                                   next.text.isEmpty ||
                                   confirm.text.isEmpty) {
-                                setModal(() => error = 'Fill in all fields.');
+                                setModal(() => error = sheetL10n.t('fill_all_fields'));
                                 return;
                               }
                               if (next.text != confirm.text) {
                                 setModal(
-                                  () => error =
-                                      'New password and confirmation do not match.',
+                                  () => error = sheetL10n.t('password_mismatch'),
                                 );
                                 return;
                               }
@@ -533,7 +564,7 @@ class _ProfileTabState extends State<ProfileTab> {
                               confirm.clear();
                               setModal(() {
                                 saving = false;
-                                success = 'Password updated successfully.';
+                                success = sheetL10n.t('password_updated');
                               });
                             },
                       style: FilledButton.styleFrom(
@@ -552,9 +583,9 @@ class _ProfileTabState extends State<ProfileTab> {
                                 color: Colors.white,
                               ),
                             )
-                          : const Text(
-                              'Update password',
-                              style: TextStyle(fontWeight: FontWeight.w800),
+                          : Text(
+                              LocaleScope.of(ctx).t('update_password'),
+                              style: const TextStyle(fontWeight: FontWeight.w800),
                             ),
                     ),
                   ),
@@ -568,6 +599,110 @@ class _ProfileTabState extends State<ProfileTab> {
     current.dispose();
     next.dispose();
     confirm.dispose();
+  }
+}
+
+class _LanguageToggle extends StatelessWidget {
+  const _LanguageToggle({
+    required this.code,
+    required this.label,
+    required this.engLabel,
+    required this.somLabel,
+    required this.onSelect,
+  });
+
+  final String code;
+  final String label;
+  final String engLabel;
+  final String somLabel;
+  final Future<void> Function(String) onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: EkaadhColors.brandLight,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.language, color: EkaadhColors.brand, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              color: EkaadhColors.surface,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE8E8EE)),
+            ),
+            padding: const EdgeInsets.all(3),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _LangChip(
+                  label: engLabel,
+                  selected: code == 'en',
+                  onTap: () => onSelect('en'),
+                ),
+                _LangChip(
+                  label: somLabel,
+                  selected: code == 'so',
+                  onTap: () => onSelect('so'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LangChip extends StatelessWidget {
+  const _LangChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? EkaadhColors.brand : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            color: selected ? Colors.white : EkaadhColors.muted,
+          ),
+        ),
+      ),
+    );
   }
 }
 

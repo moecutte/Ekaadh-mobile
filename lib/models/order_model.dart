@@ -1,3 +1,5 @@
+import 'package:ekaadh_mobile/core/media_url.dart';
+
 class OrderTicket {
   final int id;
   final String ticketCode;
@@ -109,7 +111,7 @@ class OrderModel {
       totalAmount: (json['total_amount'] as num).toDouble(),
       paymentMethod: json['payment_method'] as String?,
       eventTitle: event?['title'] as String?,
-      eventCover: event?['cover_image'] as String?,
+      eventCover: MediaUrl.resolve(event?['cover_image'] as String?),
       eventDateLabel: event?['event_date_label'] as String?,
       eventTimeLabel: event?['event_time_label'] as String?,
       venue: event?['venue'] as String?,

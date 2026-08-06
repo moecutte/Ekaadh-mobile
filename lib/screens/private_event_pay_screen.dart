@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ekaadh_mobile/core/locale_scope.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
 import 'package:ekaadh_mobile/models/order_model.dart';
 import 'package:ekaadh_mobile/models/private_event_model.dart';
@@ -88,7 +89,7 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Payment successful')),
+        SnackBar(content: Text(LocaleScope.of(context).t('payment_successful_short'))),
       );
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
@@ -110,11 +111,12 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
     final order = _order;
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Pay for tickets', style: TextStyle(fontWeight: FontWeight.w900)),
+        title: Text(l10n.t('pay_for_tickets'), style: const TextStyle(fontWeight: FontWeight.w900)),
         backgroundColor: Colors.white,
         foregroundColor: EkaadhColors.dark,
         elevation: 0,
@@ -124,7 +126,7 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
           : order == null
               ? Center(
                   child: Text(
-                    _error ?? 'No pending payment found.',
+                    _error ?? l10n.t('no_pending_payment'),
                     style: const TextStyle(color: EkaadhColors.danger),
                   ),
                 )
@@ -153,7 +155,7 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      '${item.quantity} × ${item.ticketTypeName ?? 'Ticket'}',
+                                      '${item.quantity} × ${item.ticketTypeName ?? l10n.t('ticket_singular')}',
                                       style: const TextStyle(fontWeight: FontWeight.w600),
                                     ),
                                   ),
@@ -169,7 +171,7 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text('Service fee', style: TextStyle(color: EkaadhColors.muted)),
+                              Text(l10n.t('service_fee'), style: const TextStyle(color: EkaadhColors.muted)),
                               Text('\$${order.serviceFee.toStringAsFixed(2)}'),
                             ],
                           ),
@@ -177,7 +179,7 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text('Total', style: TextStyle(fontWeight: FontWeight.w900)),
+                              Text(l10n.t('total'), style: const TextStyle(fontWeight: FontWeight.w900)),
                               Text(
                                 '\$${order.totalAmount.toStringAsFixed(2)}',
                                 style: const TextStyle(
@@ -190,7 +192,7 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Order ${order.orderNumber}',
+                            '${l10n.t('order_ref')} ${order.orderNumber}',
                             style: const TextStyle(fontSize: 11, color: EkaadhColors.soft),
                           ),
                         ],
@@ -206,9 +208,9 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'PAYMENT METHOD',
-                            style: TextStyle(
+                          Text(
+                            l10n.t('payment').toUpperCase(),
+                            style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
                               color: Color(0xFF9CA3AF),
@@ -252,7 +254,7 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
                                   color: Colors.white,
                                 ),
                               )
-                            : Text('Pay \$${order.totalAmount.toStringAsFixed(2)}'),
+                            : Text('${l10n.t('pay_with')} \$${order.totalAmount.toStringAsFixed(2)}'),
                       ),
                     ),
                   ],

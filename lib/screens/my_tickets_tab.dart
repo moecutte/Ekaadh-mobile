@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:ekaadh_mobile/core/locale_scope.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
 import 'package:ekaadh_mobile/models/ticket_model.dart';
 import 'package:ekaadh_mobile/screens/ticket_view_screen.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/services/otp_service.dart';
 import 'package:ekaadh_mobile/services/ticket_service.dart';
+import 'package:ekaadh_mobile/widgets/design_network_image.dart';
 import 'package:ekaadh_mobile/widgets/phone_number_field.dart';
 
 class MyTicketsTab extends StatefulWidget {
@@ -72,8 +74,9 @@ class _MyTicketsTabState extends State<MyTicketsTab> {
   }
 
   Future<void> _sendFindOtp() async {
+    final l10n = LocaleScope.of(context);
     if (!PhoneNumberField.hasLocalNumber(_phoneController.text)) {
-      setState(() => _lookupError = 'Enter your phone number.');
+      setState(() => _lookupError = l10n.t('enter_phone'));
       return;
     }
     setState(() {
@@ -90,7 +93,7 @@ class _MyTicketsTabState extends State<MyTicketsTab> {
         _lookingUp = false;
         _otpSent = true;
         _otpHint = result.debugCode != null
-            ? 'Testing code: ${result.debugCode}'
+            ? '${l10n.t('testing_code')}: ${result.debugCode}'
             : result.message;
       });
     } catch (e) {
@@ -103,12 +106,13 @@ class _MyTicketsTabState extends State<MyTicketsTab> {
   }
 
   Future<void> _lookupTickets() async {
+    final l10n = LocaleScope.of(context);
     if (!_otpSent) {
       await _sendFindOtp();
       return;
     }
     if (_otpController.text.trim().isEmpty) {
-      setState(() => _lookupError = 'Enter the confirmation code.');
+      setState(() => _lookupError = l10n.t('enter_confirmation_code'));
       return;
     }
     setState(() {
@@ -167,6 +171,7 @@ class _MyTicketsTabState extends State<MyTicketsTab> {
       );
     }
 
+    final l10n = LocaleScope.of(context);
     return ColoredBox(
       color: Colors.white,
       child: SafeArea(
@@ -174,15 +179,15 @@ class _MyTicketsTabState extends State<MyTicketsTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 12, 20, 0),
-            child: Text('Booked Events', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+            child: Text(l10n.t('booked_events'), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 4, 20, 0),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
             child: Text(
-              'Tickets you bought or were invited to',
-              style: TextStyle(color: EkaadhColors.muted, fontSize: 13),
+              l10n.t('booked_events_desc'),
+              style: const TextStyle(color: EkaadhColors.muted, fontSize: 13),
             ),
           ),
           Padding(
@@ -192,11 +197,11 @@ class _MyTicketsTabState extends State<MyTicketsTab> {
               decoration: BoxDecoration(color: EkaadhColors.surface, borderRadius: BorderRadius.circular(18)),
               child: Row(
                 children: [
-                  _TabBtn(label: 'Upcoming', active: _tab == 'upcoming', onTap: () {
+                  _TabBtn(label: l10n.t('upcoming'), active: _tab == 'upcoming', onTap: () {
                     setState(() => _tab = 'upcoming');
                     _reload();
                   }),
-                  _TabBtn(label: 'Past', active: _tab == 'past', onTap: () {
+                  _TabBtn(label: l10n.t('past'), active: _tab == 'past', onTap: () {
                     setState(() => _tab = 'past');
                     _reload();
                   }),
@@ -218,7 +223,7 @@ class _MyTicketsTabState extends State<MyTicketsTab> {
                     return ListView(children: [
                       const SizedBox(height: 80),
                       Text('${snap.error}', textAlign: TextAlign.center),
-                      TextButton(onPressed: _reload, child: const Text('Retry')),
+                      TextButton(onPressed: _reload, child: Text(l10n.t('retry'))),
                     ]);
                   }
                   final tickets = snap.data ?? [];
@@ -228,15 +233,15 @@ class _MyTicketsTabState extends State<MyTicketsTab> {
                       const Icon(Icons.event_available_outlined, size: 48, color: EkaadhColors.soft),
                       const SizedBox(height: 12),
                       Text(
-                        _tab == 'upcoming' ? 'No upcoming booked events' : 'No past booked events',
+                        _tab == 'upcoming' ? l10n.t('no_upcoming_booked') : l10n.t('no_past_booked'),
                         textAlign: TextAlign.center,
                         style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
                       ),
                       const SizedBox(height: 6),
-                      const Text(
-                        'Buy tickets from Home, or open an invitation sent to your phone.',
+                      Text(
+                        l10n.t('buy_or_invitation'),
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: EkaadhColors.muted),
+                        style: const TextStyle(color: EkaadhColors.muted),
                       ),
                     ]);
                   }
@@ -264,6 +269,7 @@ class _TicketCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(20),
@@ -289,7 +295,7 @@ class _TicketCard extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   if (ticket.displayImage != null)
-                    Image.network(ticket.displayImage!, fit: BoxFit.cover)
+                    DesignNetworkImage(url: ticket.displayImage)
                   else
                     ColoredBox(
                       color: ticket.isPrivate
@@ -307,7 +313,7 @@ class _TicketCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(ticket.eventTitle ?? 'Event', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
+                        Text(ticket.eventTitle ?? l10n.t('event'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
                         Text(
                           [
                             if (ticket.eventDateLabel != null && ticket.eventDateLabel!.isNotEmpty)
@@ -334,9 +340,9 @@ class _TicketCard extends StatelessWidget {
                               color: const Color(0xFF7C3AED),
                               borderRadius: BorderRadius.circular(999),
                             ),
-                            child: const Text(
-                              'Invitation',
-                              style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
+                            child: Text(
+                              l10n.t('invitation'),
+                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
                             ),
                           ),
                         Container(
@@ -346,7 +352,7 @@ class _TicketCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
-                            ticket.status == 'valid' ? 'Valid' : ticket.status[0].toUpperCase() + ticket.status.substring(1),
+                            ticket.status == 'valid' ? l10n.t('valid') : ticket.status[0].toUpperCase() + ticket.status.substring(1),
                             style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
                           ),
                         ),
@@ -371,7 +377,7 @@ class _TicketCard extends StatelessWidget {
                   ),
                   const Icon(Icons.qr_code_2, color: EkaadhColors.brand, size: 18),
                   const SizedBox(width: 4),
-                  const Text('View QR', style: TextStyle(color: EkaadhColors.brand, fontWeight: FontWeight.w700, fontSize: 12)),
+                  Text(l10n.t('view_qr'), style: const TextStyle(color: EkaadhColors.brand, fontWeight: FontWeight.w700, fontSize: 12)),
                 ],
               ),
             ),
@@ -394,6 +400,7 @@ class _GuestTicketsResult extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
     return SafeArea(
       bottom: false,
       child: Column(
@@ -404,16 +411,16 @@ class _GuestTicketsResult extends StatelessWidget {
             child: Row(
               children: [
                 IconButton(onPressed: onBack, icon: const Icon(Icons.chevron_left)),
-                const Text('Your tickets', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+                Text(l10n.t('your_tickets'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
               ],
             ),
           ),
           Expanded(
             child: tickets.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
-                      'No available valid tickets for this phone.',
-                      style: TextStyle(color: EkaadhColors.muted),
+                      l10n.t('no_valid_tickets_phone'),
+                      style: const TextStyle(color: EkaadhColors.muted),
                     ),
                   )
                 : ListView.separated(
@@ -454,6 +461,7 @@ class _GuestTicketsGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
     return SafeArea(
       bottom: false,
       child: ListView(
@@ -471,16 +479,16 @@ class _GuestTicketsGate extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          const Text(
-            'Booked Events',
+          Text(
+            l10n.t('booked_events'),
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
+            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Sign in to view your booked events, or find guest tickets with the phone used at checkout.',
+          Text(
+            l10n.t('booked_guest_prompt'),
             textAlign: TextAlign.center,
-            style: TextStyle(color: EkaadhColors.muted, fontSize: 14, height: 1.5),
+            style: const TextStyle(color: EkaadhColors.muted, fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 28),
           SizedBox(
@@ -494,18 +502,18 @@ class _GuestTicketsGate extends StatelessWidget {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
               ),
-              child: const Text('Sign In with Phone Number'),
+              child: Text(l10n.t('sign_in_with_phone')),
             ),
           ),
           const SizedBox(height: 20),
-          const Row(
+          Row(
             children: [
-              Expanded(child: Divider()),
+              const Expanded(child: Divider()),
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: 12),
-                child: Text('OR', style: TextStyle(color: EkaadhColors.soft, fontSize: 12, fontWeight: FontWeight.w700)),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(l10n.t('or').toUpperCase(), style: const TextStyle(color: EkaadhColors.soft, fontSize: 12, fontWeight: FontWeight.w700)),
               ),
-              Expanded(child: Divider()),
+              const Expanded(child: Divider()),
             ],
           ),
           const SizedBox(height: 20),
@@ -519,9 +527,9 @@ class _GuestTicketsGate extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Find tickets by phone',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                Text(
+                  l10n.t('find_tickets_by_phone'),
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
                 ),
                 const SizedBox(height: 12),
                 PhoneNumberField(
@@ -537,7 +545,7 @@ class _GuestTicketsGate extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 6),
                     decoration: EkaadhFields.decoration(
-                      hintText: 'Confirmation code',
+                      hintText: l10n.t('confirmation_code'),
                       radius: 14,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                     ),
@@ -548,7 +556,7 @@ class _GuestTicketsGate extends StatelessWidget {
                   ],
                   TextButton(
                     onPressed: lookingUp ? null : onResend,
-                    child: const Text('Resend code', style: TextStyle(fontWeight: FontWeight.w700)),
+                    child: Text(l10n.t('resend_code'), style: const TextStyle(fontWeight: FontWeight.w700)),
                   ),
                 ],
                 if (lookupError != null) ...[
@@ -573,7 +581,7 @@ class _GuestTicketsGate extends StatelessWidget {
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2, color: EkaadhColors.brand),
                           )
-                        : Text(otpSent ? 'Verify & Show Tickets' : 'Find Tickets'),
+                        : Text(otpSent ? l10n.t('verify_show_tickets') : l10n.t('find_tickets')),
                   ),
                 ),
               ],

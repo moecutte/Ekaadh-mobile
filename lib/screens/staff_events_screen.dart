@@ -32,14 +32,32 @@ class _StaffEventsScreenState extends State<StaffEventsScreen> {
   }
 
   List<String> get _venues {
-    final names = _events
+    final names =
+        _events
+            .map((e) => e.venue?.trim())
+            .whereType<String>()
+            .where((v) => v.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return names;
+  }
+
+  /// Venues that only appear on private invitation events.
+  Set<String> get _privateOnlyVenues {
+    final privateVenues = _events
+        .where((e) => e.isPrivate)
         .map((e) => e.venue?.trim())
         .whereType<String>()
         .where((v) => v.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort();
-    return names;
+        .toSet();
+    final publicVenues = _events
+        .where((e) => !e.isPrivate)
+        .map((e) => e.venue?.trim())
+        .whereType<String>()
+        .where((v) => v.isNotEmpty)
+        .toSet();
+    return privateVenues.difference(publicVenues);
   }
 
   List<StaffEventSummary> get _filteredEvents {
@@ -57,12 +75,23 @@ class _StaffEventsScreenState extends State<StaffEventsScreen> {
       if (!mounted) return;
       setState(() {
         _events = events;
-        if (_venue != 'All' && !events.any((e) => (e.venue ?? '').trim() == _venue)) {
+        if (_venue != 'All' &&
+            !events.any((e) => (e.venue ?? '').trim() == _venue)) {
           _venue = 'All';
         }
         _loading = false;
       });
-    } catch (e) {
+    } on CheckInServiceException catch (error) {
+      if (error.sessionExpired) {
+        await widget.onSignOut();
+        return;
+      }
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = error.message;
+      });
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _loading = false;
@@ -90,7 +119,10 @@ class _StaffEventsScreenState extends State<StaffEventsScreen> {
             onPressed: () => Navigator.of(context).pop(false),
             child: const Text(
               'Cancel',
-              style: TextStyle(color: Color(0xFF9CA3AF), fontWeight: FontWeight.w700),
+              style: TextStyle(
+                color: Color(0xFF9CA3AF),
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
           FilledButton(
@@ -98,9 +130,14 @@ class _StaffEventsScreenState extends State<StaffEventsScreen> {
             style: FilledButton.styleFrom(
               backgroundColor: EkaadhColors.danger,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            child: const Text('Sign Out', style: TextStyle(fontWeight: FontWeight.w800)),
+            child: const Text(
+              'Sign Out',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
           ),
         ],
       ),
@@ -140,7 +177,10 @@ class _StaffEventsScreenState extends State<StaffEventsScreen> {
                         SizedBox(height: 4),
                         Text(
                           'Choose where you are checking guests in',
-                          style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
+                          style: TextStyle(
+                            color: Color(0xFF9CA3AF),
+                            fontSize: 13,
+                          ),
                         ),
                       ],
                     ),
@@ -162,20 +202,33 @@ class _StaffEventsScreenState extends State<StaffEventsScreen> {
                   isExpanded: true,
                   dropdownColor: const Color(0xFF1F2937),
                   decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.place_outlined, color: Color(0xFF9CA3AF), size: 20),
+                    prefixIcon: const Icon(
+                      Icons.place_outlined,
+                      color: Color(0xFF9CA3AF),
+                      size: 20,
+                    ),
                     filled: true,
                     fillColor: const Color(0xFF111827),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
                       borderSide: BorderSide.none,
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: EkaadhColors.brand, width: 1.5),
+                      borderSide: const BorderSide(
+                        color: EkaadhColors.brand,
+                        width: 1.5,
+                      ),
                     ),
                   ),
-                  icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF9CA3AF)),
+                  icon: const Icon(
+                    Icons.keyboard_arrow_down,
+                    color: Color(0xFF9CA3AF),
+                  ),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -186,7 +239,11 @@ class _StaffEventsScreenState extends State<StaffEventsScreen> {
                         (v) => DropdownMenuItem(
                           value: v,
                           child: Text(
-                            v == 'All' ? 'All Venues' : v,
+                            v == 'All'
+                                ? 'All Venues'
+                                : (_privateOnlyVenues.contains(v)
+                                      ? '$v (Private)'
+                                      : v),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -200,7 +257,9 @@ class _StaffEventsScreenState extends State<StaffEventsScreen> {
               ),
             if (_loading)
               const Expanded(
-                child: Center(child: CircularProgressIndicator(color: EkaadhColors.brand)),
+                child: Center(
+                  child: CircularProgressIndicator(color: EkaadhColors.brand),
+                ),
               )
             else if (_error != null)
               Expanded(
@@ -208,7 +267,10 @@ class _StaffEventsScreenState extends State<StaffEventsScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(_error!, style: const TextStyle(color: Color(0xFFF87171))),
+                      Text(
+                        _error!,
+                        style: const TextStyle(color: Color(0xFFF87171)),
+                      ),
                       TextButton(onPressed: _load, child: const Text('Retry')),
                     ],
                   ),
@@ -217,7 +279,10 @@ class _StaffEventsScreenState extends State<StaffEventsScreen> {
             else if (_events.isEmpty)
               const Expanded(
                 child: Center(
-                  child: Text('No published events.', style: TextStyle(color: Color(0xFF9CA3AF))),
+                  child: Text(
+                    'No published events.',
+                    style: TextStyle(color: Color(0xFF9CA3AF)),
+                  ),
                 ),
               )
             else if (filtered.isEmpty)
@@ -249,27 +314,60 @@ class _StaffEventsScreenState extends State<StaffEventsScreen> {
                         child: InkWell(
                           borderRadius: BorderRadius.circular(18),
                           onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => ScannerScreen(
-                                  auth: widget.auth,
-                                  event: event,
-                                ),
-                              ),
-                            ).then((_) => _load());
+                            Navigator.of(context)
+                                .push(
+                                  MaterialPageRoute(
+                                    builder: (_) => ScannerScreen(
+                                      auth: widget.auth,
+                                      event: event,
+                                      onSessionExpired: widget.onSignOut,
+                                    ),
+                                  ),
+                                )
+                                .then((_) => _load());
                           },
                           child: Padding(
                             padding: const EdgeInsets.all(16),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  event.title,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 16,
-                                  ),
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        event.title,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ),
+                                    if (event.isPrivate) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 3,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF312E81),
+                                          borderRadius: BorderRadius.circular(
+                                            999,
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'Private',
+                                          style: TextStyle(
+                                            color: Color(0xFFC7D2FE),
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
@@ -278,7 +376,10 @@ class _StaffEventsScreenState extends State<StaffEventsScreen> {
                                     event.eventTimeLabel,
                                     event.venue,
                                   ].whereType<String>().join(' · '),
-                                  style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
+                                  style: const TextStyle(
+                                    color: Color(0xFF9CA3AF),
+                                    fontSize: 12,
+                                  ),
                                 ),
                                 const SizedBox(height: 12),
                                 ClipRRect(

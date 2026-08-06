@@ -1,0 +1,37 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Ekaadh Android (prod API + FCM)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": [
+        "-d",
+        "android",
+        "--dart-define=API_BASE_URL=https://ekaadh.com/api/v1",
+        "--dart-define=FIREBASE_API_KEY=AIzaSyDdzFV9IlyJlKUHxWSw6IP0ixi9YE5ahag",
+        "--dart-define=FIREBASE_APP_ID=1:1041974530298:android:19a08f42603cd160a4b943",
+        "--dart-define=FIREBASE_MESSAGING_SENDER_ID=1041974530298",
+        "--dart-define=FIREBASE_PROJECT_ID=ekaadh-71c90",
+        "--dart-define=FIREBASE_STORAGE_BUCKET=ekaadh-71c90.firebasestorage.app"
+      ]
+    },
+    {
+      "name": "Ekaadh Android (local API + FCM)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": [
+        "-d",
+        "android",
+        "--dart-define=API_BASE_URL=http://10.0.2.2:8000/api/v1",
+        "--dart-define=FIREBASE_API_KEY=AIzaSyDdzFV9IlyJlKUHxWSw6IP0ixi9YE5ahag",
+        "--dart-define=FIREBASE_APP_ID=1:1041974530298:android:19a08f42603cd160a4b943",
+        "--dart-define=FIREBASE_MESSAGING_SENDER_ID=1041974530298",
+        "--dart-define=FIREBASE_PROJECT_ID=ekaadh-71c90",
+        "--dart-define=FIREBASE_STORAGE_BUCKET=ekaadh-71c90.firebasestorage.app"
+      ]
+    }
+  ]
+}

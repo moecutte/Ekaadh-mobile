@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:ekaadh_mobile/core/locale_scope.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
 import 'package:ekaadh_mobile/models/event_model.dart';
 import 'package:ekaadh_mobile/models/order_model.dart';
@@ -7,6 +8,7 @@ import 'package:ekaadh_mobile/screens/order_confirmation_screen.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/services/checkout_service.dart';
 import 'package:ekaadh_mobile/services/otp_service.dart';
+import 'package:ekaadh_mobile/widgets/design_network_image.dart';
 import 'package:ekaadh_mobile/widgets/phone_number_field.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -45,9 +47,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String? _otpToken;
   String? _otpHint;
 
-  List<String> get _stepLabels => _signedIn
-      ? const ['Select Tickets', 'Your Details', 'Payment']
-      : const ['Select Tickets', 'Your Details', 'Confirm', 'Payment'];
+  List<String> _stepLabels(BuildContext context) {
+    final l10n = LocaleScope.of(context);
+    return _signedIn
+        ? [l10n.t('step_select_tickets'), l10n.t('step_your_details'), l10n.t('step_payment')]
+        : [l10n.t('step_select_tickets'), l10n.t('step_your_details'), l10n.t('step_confirm'), l10n.t('step_payment')];
+  }
 
   int get _paymentStep => _signedIn ? 3 : 4;
   int get _maxStep => _paymentStep;
@@ -110,8 +115,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _continueFromDetails() async {
+    final l10n = LocaleScope.of(context);
     if (_name.text.trim().isEmpty || !PhoneNumberField.hasLocalNumber(_phone.text)) {
-      setState(() => _error = 'Name and phone are required');
+      setState(() => _error = l10n.t('name_phone_required'));
       return;
     }
     if (_signedIn) {
@@ -135,7 +141,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       setState(() {
         _loading = false;
         _otpHint = result.debugCode != null
-            ? 'Testing code: ${result.debugCode}'
+            ? '${LocaleScope.of(context).t('testing_code')}: ${result.debugCode}'
             : result.message;
         _otpToken = null;
         if (thenGoToConfirm) _step = 3;
@@ -150,8 +156,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _verifyCheckoutOtp() async {
+    final l10n = LocaleScope.of(context);
     if (_otp.text.trim().isEmpty) {
-      setState(() => _error = 'Enter the confirmation code');
+      setState(() => _error = l10n.t('enter_confirmation_code'));
       return;
     }
     setState(() {
@@ -180,21 +187,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _payNow() async {
+    final l10n = LocaleScope.of(context);
     if (_pay == null) {
-      setState(() => _error = 'Choose Zaad or eDahab');
+      setState(() => _error = l10n.t('choose_zaad_edahab'));
       return;
     }
     if (_name.text.trim().isEmpty || !PhoneNumberField.hasLocalNumber(_phone.text)) {
-      setState(() => _error = 'Name and phone are required');
+      setState(() => _error = l10n.t('name_phone_required'));
       return;
     }
     if (_ticketCount < 1) {
-      setState(() => _error = 'Select at least 1 ticket');
+      setState(() => _error = l10n.t('select_at_least_1'));
       return;
     }
     if (!_signedIn && (_otpToken == null || _otpToken!.isEmpty)) {
       setState(() {
-        _error = 'Confirm your phone number first';
+        _error = l10n.t('confirm_phone_first');
         _step = 3;
       });
       return;
@@ -255,11 +263,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final labels = _stepLabels(context);
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text(
-          _stepLabels[_step - 1],
+          labels[_step - 1],
           style: const TextStyle(fontWeight: FontWeight.w900),
         ),
         leading: IconButton(
@@ -271,7 +280,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-            child: _StepIndicator(step: _step, labels: _stepLabels),
+            child: _StepIndicator(step: _step, labels: labels),
           ),
           Expanded(
             child: ListView(
@@ -295,6 +304,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildBottomBar() {
+    final l10n = LocaleScope.of(context);
     if (_step == 1) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -303,8 +313,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           style: _primaryButtonStyle(enabled: _ticketCount > 0),
           child: Text(
             _ticketCount > 0
-                ? 'Continue to Your Details · \$${_total.toStringAsFixed(0)}'
-                : 'Select at least 1 ticket',
+                ? '${l10n.t('continue_to_details')} · \$${_total.toStringAsFixed(0)}'
+                : l10n.t('select_at_least_1'),
           ),
         ),
       );
@@ -319,7 +329,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: OutlinedButton(
                 onPressed: () => _goStep(1),
                 style: _outlineButtonStyle(),
-                child: const Text('Back'),
+                child: Text(l10n.t('back')),
               ),
             ),
             const SizedBox(width: 12),
@@ -327,7 +337,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: ElevatedButton(
                 onPressed: _loading ? null : _continueFromDetails,
                 style: _primaryButtonStyle(enabled: !_loading),
-                child: Text(_signedIn ? 'Continue to Payment' : 'Continue'),
+                child: Text(_signedIn ? l10n.t('continue_to_payment') : l10n.t('continue')),
               ),
             ),
           ],
@@ -344,21 +354,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ElevatedButton(
               onPressed: _loading ? null : _verifyCheckoutOtp,
               style: _primaryButtonStyle(enabled: !_loading),
-              child: const Text('Confirm & continue to payment'),
+              child: Text(l10n.t('confirm_continue_payment')),
             ),
             const SizedBox(height: 10),
             TextButton(
               onPressed: _loading ? null : () => _sendCheckoutOtp(),
-              child: const Text(
-                'Resend code',
-                style: TextStyle(color: EkaadhColors.brand, fontWeight: FontWeight.w700),
+              child: Text(
+                l10n.t('resend_code'),
+                style: const TextStyle(color: EkaadhColors.brand, fontWeight: FontWeight.w700),
               ),
             ),
             TextButton(
               onPressed: () => _goStep(2),
-              child: const Text(
-                'Back to Details',
-                style: TextStyle(color: EkaadhColors.muted, fontWeight: FontWeight.w700),
+              child: Text(
+                l10n.t('back_to_details'),
+                style: const TextStyle(color: EkaadhColors.muted, fontWeight: FontWeight.w700),
               ),
             ),
           ],
@@ -376,16 +386,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             style: _primaryButtonStyle(enabled: _pay != null && !_loading),
             child: Text(
               _pay == null
-                  ? 'Choose a payment method'
-                  : 'Pay \$${_total.toStringAsFixed(0)} with ${_pay == 'zaad' ? 'Zaad' : 'eDahab'}',
+                  ? l10n.t('choose_payment_method')
+                  : '${l10n.t('pay_with')} \$${_total.toStringAsFixed(0)} ${l10n.t('with_method')} ${_pay == 'zaad' ? 'Zaad' : 'eDahab'}'.replaceAll(RegExp(r'\s+'), ' ').trim(),
             ),
           ),
           const SizedBox(height: 10),
           TextButton(
             onPressed: () => _goStep(_signedIn ? 2 : 3),
-            child: const Text(
-              'Back',
-              style: TextStyle(color: EkaadhColors.muted, fontWeight: FontWeight.w700),
+            child: Text(
+              l10n.t('back'),
+              style: const TextStyle(color: EkaadhColors.muted, fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -418,11 +428,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildTicketsStep() {
+    final l10n = LocaleScope.of(context);
     final event = widget.event;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Order Summary', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+        Text(l10n.t('order_summary'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
         const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(18),
@@ -440,7 +451,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       width: 72,
                       height: 72,
                       child: event.coverImage != null
-                          ? Image.network(event.coverImage!, fit: BoxFit.cover)
+                          ? DesignNetworkImage(url: event.coverImage)
                           : const ColoredBox(color: Color(0xFFE2E8E4)),
                     ),
                   ),
@@ -481,7 +492,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           children: [
                             Text(t.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
                             Text(
-                              '\$${t.price.toStringAsFixed(0)} · ${t.remaining} left',
+                              '\$${t.price.toStringAsFixed(0)} · ${t.remaining} ${l10n.t('tickets_left')}',
                               style: const TextStyle(color: EkaadhColors.soft, fontSize: 12),
                             ),
                           ],
@@ -521,7 +532,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Service fee', style: TextStyle(color: EkaadhColors.muted, fontSize: 13)),
+                      Text(l10n.t('service_fee'), style: const TextStyle(color: EkaadhColors.muted, fontSize: 13)),
                       Text('\$${_serviceFee.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                     ],
                   ),
@@ -529,7 +540,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Total', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                  Text(l10n.t('total'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
                   Text(
                     '\$${_total.toStringAsFixed(0)}',
                     style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: EkaadhColors.brand),
@@ -544,10 +555,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildDetailsStep() {
+    final l10n = LocaleScope.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Your Details', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+        Text(l10n.t('your_details'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
         const SizedBox(height: 12),
         if (_signedIn)
           Container(
@@ -565,7 +577,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Signed in as ${_name.text}. Payment and tickets will use your account details.',
+                    '${l10n.t('signed_in_as')} ${_name.text}. ${l10n.t('signed_in_payment_note')}',
                     style: const TextStyle(fontSize: 13, height: 1.45, color: EkaadhColors.dark),
                   ),
                 ),
@@ -573,11 +585,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
           )
         else
-          const Padding(
-            padding: EdgeInsets.only(bottom: 16),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
             child: Text(
-              'Guest checkout — no account needed. We\'ll confirm your phone, then send tickets via SMS and WhatsApp.',
-              style: TextStyle(fontSize: 13, height: 1.45, color: EkaadhColors.muted),
+              l10n.t('guest_checkout_note'),
+              style: const TextStyle(fontSize: 13, height: 1.45, color: EkaadhColors.muted),
             ),
           ),
         Container(
@@ -588,20 +600,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
           child: Column(
             children: [
-              _field('Full Name', _name, 'e.g. Faadumo Hassan', readOnly: _signedIn),
+              _field(l10n.t('full_name'), _name, 'e.g. Faadumo Hassan', readOnly: _signedIn),
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text.rich(
+                    Text.rich(
                       TextSpan(
-                        text: 'Phone Number ',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: EkaadhColors.muted),
+                        text: '${l10n.t('phone_number')} ',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: EkaadhColors.muted),
                         children: [
                           TextSpan(
-                            text: '(Required for payment)',
-                            style: TextStyle(color: EkaadhColors.brand, fontWeight: FontWeight.w600, fontSize: 11),
+                            text: l10n.t('phone_required_payment'),
+                            style: const TextStyle(color: EkaadhColors.brand, fontWeight: FontWeight.w600, fontSize: 11),
                           ),
                         ],
                       ),
@@ -617,7 +629,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ),
               ),
               _field(
-                'Email Address (Optional)',
+                l10n.t('email_optional'),
                 _email,
                 'yourname@example.com',
                 keyboard: TextInputType.emailAddress,
@@ -631,13 +643,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildOtpStep() {
+    final l10n = LocaleScope.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Confirm phone', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+        Text(l10n.t('confirm_phone'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
         const SizedBox(height: 8),
         Text(
-          'Enter the 6-digit code sent to ${PhoneNumberField.fullNumber(_phone.text)}.',
+          '${l10n.t('enter_code_sent_to')} ${PhoneNumberField.fullNumber(_phone.text)}.',
           style: const TextStyle(fontSize: 13, height: 1.45, color: EkaadhColors.muted),
         ),
         if (_otpHint != null) ...[
@@ -662,14 +675,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildPaymentStep() {
+    final l10n = LocaleScope.of(context);
+    final methodLabel = _pay == 'zaad' ? 'Zaad (Telesom)' : 'eDahab (Hormuud)';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Payment', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+        Text(l10n.t('payment'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
         const SizedBox(height: 6),
-        const Text(
-          'Choose your preferred mobile money method',
-          style: TextStyle(fontSize: 13, color: EkaadhColors.muted),
+        Text(
+          l10n.t('choose_payment'),
+          style: const TextStyle(fontSize: 13, color: EkaadhColors.muted),
         ),
         const SizedBox(height: 16),
         Row(
@@ -678,7 +693,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: _PayCard(
                 id: 'zaad',
                 label: 'Zaad',
-                sub: 'Telesom mobile money',
+                sub: l10n.t('mobile_money_telesom'),
                 abbr: 'Z',
                 bg: const Color(0xFFFFF3E0),
                 fg: const Color(0xFFE65100),
@@ -691,7 +706,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: _PayCard(
                 id: 'edahab',
                 label: 'eDahab',
-                sub: 'Hormuud mobile money',
+                sub: l10n.t('mobile_money_hormuud'),
                 abbr: 'eD',
                 bg: const Color(0xFFE3F2FD),
                 fg: const Color(0xFF1565C0),
@@ -714,8 +729,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               children: [
                 Text(
                   _signedIn
-                      ? 'Charge ${_pay == 'zaad' ? 'Zaad (Telesom)' : 'eDahab (Hormuud)'} on your account phone'
-                      : 'Enter your ${_pay == 'zaad' ? 'Zaad (Telesom)' : 'eDahab (Hormuud)'} number to charge',
+                      ? '${l10n.t('charge_on_account_phone')} $methodLabel ${l10n.t('on_your_account_phone')}'
+                      : '${l10n.t('enter_number_to_charge')} $methodLabel ${l10n.t('number_to_charge')}',
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 10),
@@ -735,7 +750,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Total to charge', style: TextStyle(fontWeight: FontWeight.w600, color: EkaadhColors.muted, fontSize: 13)),
+                      Text(l10n.t('total_to_charge'), style: const TextStyle(fontWeight: FontWeight.w600, color: EkaadhColors.muted, fontSize: 13)),
                       Text(
                         '\$${_total.toStringAsFixed(0)}',
                         style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20),
@@ -746,23 +761,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 if (kDebugMode)
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text(
-                      'Simulate failed payment (debug)',
-                      style: TextStyle(fontSize: 13, color: EkaadhColors.muted),
+                    title: Text(
+                      l10n.t('simulate_fail'),
+                      style: const TextStyle(fontSize: 13, color: EkaadhColors.muted),
                     ),
                     value: _forceFail,
                     activeThumbColor: EkaadhColors.brand,
                     onChanged: (v) => setState(() => _forceFail = v),
                   ),
                 const SizedBox(height: 8),
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.verified_user_outlined, size: 14, color: EkaadhColors.brand),
-                    SizedBox(width: 6),
+                    const Icon(Icons.verified_user_outlined, size: 14, color: EkaadhColors.brand),
+                    const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'Your payment is encrypted and secure. A confirmation SMS will be sent immediately.',
-                        style: TextStyle(fontSize: 11, color: EkaadhColors.muted, height: 1.4),
+                        l10n.t('encryption_note'),
+                        style: const TextStyle(fontSize: 11, color: EkaadhColors.muted, height: 1.4),
                       ),
                     ),
                   ],
@@ -994,23 +1009,24 @@ class _ProcessingDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
     return Dialog(
       backgroundColor: EkaadhColors.brandLight,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      child: const Padding(
-        padding: EdgeInsets.all(32),
+      child: Padding(
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
+            const SizedBox(
               width: 56,
               height: 56,
               child: CircularProgressIndicator(color: EkaadhColors.brand, strokeWidth: 3),
             ),
-            SizedBox(height: 20),
-            Text('Processing Payment', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-            SizedBox(height: 6),
-            Text('Please wait…', style: TextStyle(color: EkaadhColors.muted)),
+            const SizedBox(height: 20),
+            Text(l10n.t('processing_payment'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+            const SizedBox(height: 6),
+            Text(l10n.t('please_wait'), style: const TextStyle(color: EkaadhColors.muted)),
           ],
         ),
       ),
@@ -1026,6 +1042,7 @@ class PaymentFailedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
     return Scaffold(
       backgroundColor: const Color(0xFFFFF5F5),
       body: SafeArea(
@@ -1041,7 +1058,7 @@ class PaymentFailedScreen extends StatelessWidget {
                 child: const Icon(Icons.cancel, size: 56, color: EkaadhColors.danger),
               ),
               const SizedBox(height: 24),
-              const Text('Payment Failed', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
+              Text(l10n.t('payment_failed'), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
               const SizedBox(height: 10),
               Text(message, textAlign: TextAlign.center, style: const TextStyle(color: EkaadhColors.muted, height: 1.65)),
               if (order != null) ...[
@@ -1060,12 +1077,12 @@ class PaymentFailedScreen extends StatelessWidget {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                     textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
                   ),
-                  child: const Text('Try Again'),
+                  child: Text(l10n.t('try_again')),
                 ),
               ),
               TextButton(
                 onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
-                child: const Text('Back to Home', style: TextStyle(color: EkaadhColors.soft, fontWeight: FontWeight.w700)),
+                child: Text(l10n.t('back_to_home'), style: const TextStyle(color: EkaadhColors.soft, fontWeight: FontWeight.w700)),
               ),
             ],
           ),

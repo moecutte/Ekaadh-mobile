@@ -9,20 +9,24 @@ class ScannerScreen extends StatefulWidget {
     super.key,
     required this.auth,
     required this.event,
+    required this.onSessionExpired,
   });
 
   final AuthService auth;
   final StaffEventSummary event;
+  final Future<void> Function() onSessionExpired;
 
   @override
   State<ScannerScreen> createState() => _ScannerScreenState();
 }
 
-class _ScannerScreenState extends State<ScannerScreen> {
+class _ScannerScreenState extends State<ScannerScreen>
+    with WidgetsBindingObserver {
   late final CheckInService _service = CheckInService(widget.auth);
   final MobileScannerController _controller = MobileScannerController(
     detectionSpeed: DetectionSpeed.normal,
     facing: CameraFacing.back,
+    formats: const [BarcodeFormat.qrCode],
   );
 
   bool _busy = false;
@@ -30,10 +34,44 @@ class _ScannerScreenState extends State<ScannerScreen> {
   final _manualController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     _manualController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _result == null && !_busy) {
+      _startCamera();
+    } else if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _stopCamera();
+    }
+  }
+
+  Future<void> _startCamera() async {
+    try {
+      await _controller.start();
+    } catch (_) {
+      // The scanner widget displays camera startup and permission errors.
+    }
+  }
+
+  Future<void> _stopCamera() async {
+    try {
+      await _controller.stop();
+    } catch (_) {
+      // The camera may not have started yet.
+    }
   }
 
   Future<void> _handlePayload(String raw) async {
@@ -42,6 +80,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
     if (payload.isEmpty) return;
 
     setState(() => _busy = true);
+    await _stopCamera();
     try {
       final result = await _service.scan(
         payload: payload,
@@ -52,8 +91,19 @@ class _ScannerScreenState extends State<ScannerScreen> {
         _result = result;
         _busy = false;
       });
-      Future.delayed(const Duration(seconds: 3), () {
-        if (mounted) setState(() => _result = null);
+    } on CheckInServiceException catch (error) {
+      if (error.sessionExpired) {
+        await widget.onSessionExpired();
+        return;
+      }
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _result = CheckInResult(
+          result: 'invalid',
+          message: error.message,
+          ticket: null,
+        );
       });
     } catch (_) {
       if (!mounted) return;
@@ -65,17 +115,21 @@ class _ScannerScreenState extends State<ScannerScreen> {
           ticket: null,
         );
       });
-      Future.delayed(const Duration(seconds: 3), () {
-        if (mounted) setState(() => _result = null);
-      });
     }
   }
 
+  Future<void> _scanNext() async {
+    _manualController.clear();
+    setState(() => _result = null);
+    await _startCamera();
+  }
+
   void _onDetect(BarcodeCapture capture) {
+    if (_busy || _result != null) return;
     final barcodes = capture.barcodes;
     if (barcodes.isEmpty) return;
     final value = barcodes.first.rawValue;
-    if (value != null) {
+    if (value != null && value.trim().isNotEmpty) {
       _handlePayload(value);
     }
   }
@@ -122,6 +176,20 @@ class _ScannerScreenState extends State<ScannerScreen> {
           MobileScanner(
             controller: _controller,
             onDetect: _onDetect,
+            errorBuilder: (context, error, child) => ColoredBox(
+              color: EkaadhColors.dark,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    'Camera unavailable (${error.errorCode.name}).\n'
+                    'Allow camera access or enter the ticket code below.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white70, height: 1.4),
+                  ),
+                ),
+              ),
+            ),
           ),
           SafeArea(
             child: Column(
@@ -149,7 +217,10 @@ class _ScannerScreenState extends State<ScannerScreen> {
                             ),
                             Text(
                               '${widget.event.ticketsCheckedIn}/${widget.event.ticketsTotal} in',
-                              style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
+                              style: const TextStyle(
+                                color: Color(0xFF9CA3AF),
+                                fontSize: 12,
+                              ),
                             ),
                           ],
                         ),
@@ -162,13 +233,18 @@ class _ScannerScreenState extends State<ScannerScreen> {
                   ),
                 ),
                 const Spacer(),
-                Center(
-                  child: Container(
-                    width: 240,
-                    height: 240,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: EkaadhColors.brand.withValues(alpha: 0.85), width: 3),
-                      borderRadius: BorderRadius.circular(24),
+                IgnorePointer(
+                  child: Center(
+                    child: Container(
+                      width: 240,
+                      height: 240,
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: EkaadhColors.brand.withValues(alpha: 0.85),
+                          width: 3,
+                        ),
+                        borderRadius: BorderRadius.circular(24),
+                      ),
                     ),
                   ),
                 ),
@@ -178,13 +254,18 @@ class _ScannerScreenState extends State<ScannerScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   decoration: BoxDecoration(
                     color: EkaadhColors.dark.withValues(alpha: 0.93),
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
                   ),
                   child: Column(
                     children: [
                       const Text(
                         'Align QR inside the frame',
-                        style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
+                        style: TextStyle(
+                          color: Color(0xFF9CA3AF),
+                          fontSize: 13,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       Row(
@@ -192,30 +273,43 @@ class _ScannerScreenState extends State<ScannerScreen> {
                           Expanded(
                             child: TextField(
                               controller: _manualController,
-                              style: const TextStyle(color: Colors.white, fontSize: 14),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                              ),
                               decoration: InputDecoration(
                                 hintText: 'Or enter EKD-… code',
-                                hintStyle: const TextStyle(color: Color(0xFF4B5563)),
+                                hintStyle: const TextStyle(
+                                  color: Color(0xFF4B5563),
+                                ),
                                 filled: true,
                                 fillColor: const Color(0xFF111827),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(14),
                                   borderSide: BorderSide.none,
                                 ),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 12,
+                                ),
                               ),
                             ),
                           ),
                           const SizedBox(width: 8),
                           ElevatedButton(
-                            onPressed: _busy
+                            onPressed: _busy || _result != null
                                 ? null
                                 : () => _handlePayload(_manualController.text),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: EkaadhColors.brand,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
                             ),
                             child: const Text('Check'),
                           ),
@@ -230,7 +324,9 @@ class _ScannerScreenState extends State<ScannerScreen> {
           if (_busy)
             const ColoredBox(
               color: Color(0x66000000),
-              child: Center(child: CircularProgressIndicator(color: EkaadhColors.brand)),
+              child: Center(
+                child: CircularProgressIndicator(color: EkaadhColors.brand),
+              ),
             ),
           if (_result != null)
             ColoredBox(
@@ -256,7 +352,10 @@ class _ScannerScreenState extends State<ScannerScreen> {
                         Text(
                           _result!.message,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(color: Colors.white70, fontSize: 14),
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
                         ),
                         if (_result!.ticket != null) ...[
                           const SizedBox(height: 20),
@@ -283,11 +382,25 @@ class _ScannerScreenState extends State<ScannerScreen> {
                           ),
                         ],
                         const SizedBox(height: 28),
-                        TextButton(
-                          onPressed: () => setState(() => _result = null),
-                          child: const Text(
-                            'Scan next',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _scanNext,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: _resultColor,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: const Text(
+                              'Next',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 16,
+                              ),
+                            ),
                           ),
                         ),
                       ],

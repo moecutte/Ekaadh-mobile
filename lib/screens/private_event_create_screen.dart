@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ekaadh_mobile/core/locale_scope.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
 import 'package:ekaadh_mobile/models/private_event_model.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
@@ -17,7 +18,15 @@ class PrivateEventCreateScreen extends StatefulWidget {
 }
 
 class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
-  static const _stepLabels = ['Event info', 'Design', 'Invitation text', 'Payment'];
+  List<String> _stepLabels(BuildContext context) {
+    final l10n = LocaleScope.of(context);
+    return [
+      l10n.t('event_info'),
+      l10n.t('design'),
+      l10n.t('invitation_text'),
+      l10n.t('payment'),
+    ];
+  }
 
   late final PrivateEventService _service;
   final _pageController = PageController();
@@ -200,18 +209,18 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
 
   String _monthName(int month) {
     const names = [
-      'January',
-      'February',
-      'March',
-      'April',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
       'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     if (month < 1 || month > 12) return '';
     return names[month - 1];
@@ -275,29 +284,30 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
   }
 
   bool _validateStep(int step) {
+    final l10n = LocaleScope.of(context);
     setState(() => _error = null);
     switch (step) {
       case 0:
         if (_categoryId == null) {
-          setState(() => _error = 'Choose a category.');
+          setState(() => _error = l10n.t('choose_category'));
           return false;
         }
         if (_description.text.trim().isEmpty) {
-          setState(() => _error = 'Enter a description.');
+          setState(() => _error = l10n.t('enter_description'));
           return false;
         }
         if (_date == null) {
-          setState(() => _error = 'Choose an event date.');
+          setState(() => _error = l10n.t('choose_event_date'));
           return false;
         }
         if (_venue.text.trim().isEmpty) {
-          setState(() => _error = 'Enter a venue.');
+          setState(() => _error = l10n.t('enter_venue'));
           return false;
         }
         return true;
       case 1:
         if (_designId.isEmpty || _selectedDesign == null) {
-          setState(() => _error = 'Choose an invitation design.');
+          setState(() => _error = l10n.t('choose_design'));
           return false;
         }
         _seedFieldDefaults();
@@ -307,7 +317,7 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
       case 2:
         final design = _selectedDesign;
         if (design == null) {
-          setState(() => _error = 'Choose an invitation design.');
+          setState(() => _error = l10n.t('choose_design'));
           return false;
         }
         for (final field in design.buyerFields) {
@@ -356,7 +366,7 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
 
     final design = _selectedDesign;
     if (design == null || design.invitationDesignId == null) {
-      setState(() => _error = 'Choose an invitation design.');
+      setState(() => _error = LocaleScope.of(context).t('choose_design'));
       return;
     }
 
@@ -428,6 +438,8 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
+    final steps = _stepLabels(context);
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -435,11 +447,11 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              _stepLabels[_step],
+              steps[_step],
               style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
             ),
             Text(
-              'Step ${_step + 1} of 4',
+              '${l10n.t('step_of')} ${_step + 1} ${l10n.t('of')} 4',
               style: const TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
@@ -507,6 +519,7 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
   }
 
   Widget _stepIndicator() {
+    final steps = _stepLabels(context);
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
@@ -531,7 +544,7 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    _stepLabels[i],
+                    steps[i],
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
@@ -569,7 +582,7 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
                 side: const BorderSide(color: EkaadhColors.fieldBorder),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
-              child: const Text('Back', style: TextStyle(fontWeight: FontWeight.w800)),
+              child: Text(LocaleScope.of(context).t('back'), style: const TextStyle(fontWeight: FontWeight.w800)),
             ),
           if (_step > 0) const SizedBox(width: 10),
           Expanded(
@@ -593,8 +606,8 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
                     )
                   : Text(
                       isLast
-                          ? 'Continue to payment · \$${_total.toStringAsFixed(2)}'
-                          : 'Continue',
+                          ? '${LocaleScope.of(context).t('continue_to_payment_amount')} · \$${_total.toStringAsFixed(2)}'
+                          : LocaleScope.of(context).t('continue'),
                     ),
             ),
           ),
@@ -607,29 +620,29 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       children: [
-        const Text(
-          'Tell us about your event. Date and venue will be applied to your invitation design.',
+        Text(
+          LocaleScope.of(context).t('event_info_hint'),
           style: TextStyle(color: EkaadhColors.muted, fontSize: 13, height: 1.4),
         ),
         const SizedBox(height: 16),
         _card([
-          _label('Category *'),
+          _label(LocaleScope.of(context).t('category_required')),
           if (_meta != null && _meta!.categories.isNotEmpty)
             DropdownButtonFormField<int>(
               key: ValueKey(_categoryId ?? 'category'),
               initialValue: _categoryId,
-              decoration: EkaadhFields.decoration(hintText: 'Select category'),
+              decoration: EkaadhFields.decoration(hintText: LocaleScope.of(context).t('select_category')),
               items: _meta!.categories
                   .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
                   .toList(),
               onChanged: _onCategoryChanged,
             ),
           const SizedBox(height: 12),
-          _label('Description *'),
+          _label(LocaleScope.of(context).t('description_required')),
           TextField(
             controller: _description,
             maxLines: 4,
-            decoration: EkaadhFields.decoration(hintText: 'About your event'),
+            decoration: EkaadhFields.decoration(hintText: LocaleScope.of(context).t('about_your_event')),
           ),
           const SizedBox(height: 12),
           Row(
@@ -638,7 +651,7 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _label('Date *'),
+                    _label(LocaleScope.of(context).t('date_required')),
                     OutlinedButton(
                       onPressed: _pickDate,
                       style: OutlinedButton.styleFrom(
@@ -648,7 +661,7 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
                       child: Text(
-                        _date == null ? 'Pick date' : _fmtDate(_date!),
+                        _date == null ? LocaleScope.of(context).t('pick_date') : _fmtDate(_date!),
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),
@@ -660,7 +673,7 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _label('Time *'),
+                    _label(LocaleScope.of(context).t('time_required')),
                     OutlinedButton(
                       onPressed: _pickTime,
                       style: OutlinedButton.styleFrom(
@@ -680,10 +693,10 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          _label('Venue *'),
+          _label(LocaleScope.of(context).t('venue_required')),
           TextField(
             controller: _venue,
-            decoration: EkaadhFields.decoration(hintText: 'Venue name'),
+            decoration: EkaadhFields.decoration(hintText: LocaleScope.of(context).t('venue_name')),
           ),
         ]),
       ],
@@ -694,32 +707,32 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       children: [
-        const Text(
-          'Choose an invitation design for your category.',
+        Text(
+          LocaleScope.of(context).t('choose_design_hint'),
           style: TextStyle(color: EkaadhColors.muted, fontSize: 13, height: 1.4),
         ),
         const SizedBox(height: 16),
         if (_meta != null) ...[
           _card([
             if (_meta!.designsForCategory(_categoryId).isEmpty)
-              const Text(
-                'No designs for this category yet. Go back and pick another category, or ask an admin to upload designs.',
-                style: TextStyle(color: EkaadhColors.muted, fontSize: 13),
+              Text(
+                LocaleScope.of(context).t('no_designs_category'),
+                style: const TextStyle(color: EkaadhColors.muted, fontSize: 13),
               )
             else ...[
               Text(
-                'Premium adds \$${_meta!.premiumDesignSurcharge.toStringAsFixed(2)}/ticket.',
+                '${LocaleScope.of(context).t('premium_adds')} \$${_meta!.premiumDesignSurcharge.toStringAsFixed(2)}${LocaleScope.of(context).t('per_ticket')}',
                 style: const TextStyle(color: EkaadhColors.muted, fontSize: 12),
               ),
               const SizedBox(height: 14),
               if (_meta!.standardForCategory(_categoryId).isNotEmpty) ...[
-                _label('Standard'),
+                _label(LocaleScope.of(context).t('standard')),
                 const SizedBox(height: 8),
                 _designGrid(_meta!.standardForCategory(_categoryId)),
               ],
               if (_meta!.premiumForCategory(_categoryId).isNotEmpty) ...[
                 const SizedBox(height: 14),
-                _label('Premium'),
+                _label(LocaleScope.of(context).t('premium')),
                 const SizedBox(height: 8),
                 _designGrid(_meta!.premiumForCategory(_categoryId)),
               ],
@@ -733,23 +746,23 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
   Widget _stepInvitationText() {
     final design = _selectedDesign;
     if (design == null) {
-      return const Center(
-        child: Text('Select a design first.', style: TextStyle(color: EkaadhColors.muted)),
+      return Center(
+        child: Text(LocaleScope.of(context).t('select_design_first'), style: TextStyle(color: EkaadhColors.muted)),
       );
     }
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       children: [
-        const Text(
-          'Preview your invitation and edit the text shown on the design.',
+        Text(
+          LocaleScope.of(context).t('preview_edit_hint'),
           style: TextStyle(color: EkaadhColors.muted, fontSize: 13, height: 1.4),
         ),
         const SizedBox(height: 16),
         _card([
           Row(
             children: [
-              const Text('Live preview', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+              Text(LocaleScope.of(context).t('live_preview'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
               const Spacer(),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -758,7 +771,7 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  design.isPremium ? 'Premium' : 'Standard',
+                  design.isPremium ? LocaleScope.of(context).t('premium') : LocaleScope.of(context).t('standard'),
                   style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: EkaadhColors.brand),
                 ),
               ),
@@ -770,14 +783,14 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
         if (design.buyerFields.isNotEmpty) ...[
           const SizedBox(height: 14),
           _card([
-            const Text(
-              'Invitation text',
-              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+            Text(
+              LocaleScope.of(context).t('invitation_text'),
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
             ),
             const SizedBox(height: 4),
-            const Text(
-              'Change sample text for each field on the card. Date and time parts fill from step 1.',
-              style: TextStyle(color: EkaadhColors.muted, fontSize: 12),
+            Text(
+              LocaleScope.of(context).t('invitation_text_hint'),
+              style: const TextStyle(color: EkaadhColors.muted, fontSize: 12),
             ),
             const SizedBox(height: 14),
             for (final field in design.buyerFields) ...[
@@ -796,14 +809,14 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
         ] else if (design.autoDateFields.isNotEmpty) ...[
           const SizedBox(height: 14),
           _card([
-            const Text(
-              'Date & time on the card',
-              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+            Text(
+              LocaleScope.of(context).t('date_time_on_card'),
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Month, day, year, and time update automatically from the event date and time you chose.',
-              style: TextStyle(color: EkaadhColors.muted, fontSize: 12),
+            Text(
+              LocaleScope.of(context).t('date_time_auto_hint'),
+              style: const TextStyle(color: EkaadhColors.muted, fontSize: 12),
             ),
           ]),
         ],
@@ -815,13 +828,13 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       children: [
-        const Text(
-          'Set how many tickets to buy and review pricing before payment.',
+        Text(
+          LocaleScope.of(context).t('set_qty_review'),
           style: TextStyle(color: EkaadhColors.muted, fontSize: 13, height: 1.4),
         ),
         const SizedBox(height: 16),
         _card([
-          _label('Ticket quantity'),
+          _label(LocaleScope.of(context).t('ticket_quantity')),
           Row(
             children: [
               IconButton(
@@ -845,7 +858,7 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          _label('Ticket label'),
+          _label(LocaleScope.of(context).t('ticket_label')),
           TextField(
             controller: _ticketLabel,
             decoration: EkaadhFields.decoration(hintText: 'Invitation'),
@@ -859,11 +872,11 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
             ),
             child: Column(
               children: [
-                _totalRow('Price / ticket', _unitNow),
+                _totalRow(LocaleScope.of(context).t('price_per_ticket'), _unitNow),
                 _totalRow('Subtotal', _subtotal),
-                _totalRow('Service fee', _meta?.serviceFee ?? 0),
+                _totalRow(LocaleScope.of(context).t('service_fee'), _meta?.serviceFee ?? 0),
                 const Divider(height: 18),
-                _totalRow('Total due', _total, bold: true),
+                _totalRow(LocaleScope.of(context).t('total_due'), _total, bold: true),
               ],
             ),
           ),

@@ -1,5 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
+import 'package:ekaadh_mobile/core/locale_scope.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/screens/home_tab.dart';
 import 'package:ekaadh_mobile/screens/search_tab.dart';
@@ -27,6 +28,7 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+  bool _hasPrivateEvents = false;
 
   void _goTo(int i) => setState(() => _index = i);
 
@@ -79,10 +81,12 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
     final user = widget.auth.user;
+    final signedIn = widget.auth.token != null && user != null;
     final pages = [
       HomeTab(
-        userName: user?.name ?? 'Guest',
+        userName: user?.name ?? l10n.t('guest'),
         auth: widget.auth,
         onOpenSearch: _openSearch,
       ),
@@ -96,12 +100,17 @@ class _HomeShellState extends State<HomeShell> {
         onSignIn: _openLogin,
         onRegister: _openRegister,
         active: _index == 2,
+        onHasEventsChanged: (hasEvents) {
+          if (_hasPrivateEvents != hasEvents) {
+            setState(() => _hasPrivateEvents = hasEvents);
+          }
+        },
       ),
       ProfileTab(
         auth: widget.auth,
         onSignOut: () async {
           await widget.onSignOut();
-          if (mounted) setState(() {});
+          if (mounted) setState(() => _hasPrivateEvents = false);
         },
         onSignIn: _openLogin,
         onRegister: _openRegister,
@@ -110,11 +119,12 @@ class _HomeShellState extends State<HomeShell> {
       ),
     ];
 
-    const items = [
-      (Icons.home_outlined, Icons.home_rounded, 'Home'),
-      (Icons.event_available_outlined, Icons.event_available, 'Booked Events'),
-      (Icons.confirmation_number_outlined, Icons.confirmation_number, 'Tickets'),
-      (Icons.person_outline, Icons.person, 'Profile'),
+    final items = [
+      (Icons.home_outlined, Icons.home_rounded, l10n.t('home')),
+      (Icons.event_available_outlined, Icons.event_available, l10n.t('booked_events')),
+      (Icons.confirmation_number_outlined, Icons.confirmation_number,
+          signedIn && _hasPrivateEvents ? l10n.t('tickets') : l10n.t('create')),
+      (Icons.person_outline, Icons.person, l10n.t('profile')),
     ];
 
     return Scaffold(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ekaadh_mobile/core/locale_scope.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/screens/register_screen.dart';
@@ -37,8 +38,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submit() async {
+    final l10n = LocaleScope.of(context);
     if (!PhoneNumberField.hasLocalNumber(_loginController.text)) {
-      setState(() => _error = 'Enter your phone number.');
+      setState(() => _error = l10n.t('enter_phone'));
       return;
     }
     setState(() {
@@ -60,6 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -73,9 +76,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: TextButton.icon(
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.chevron_left, color: EkaadhColors.soft),
-                    label: const Text(
-                      'Continue as guest',
-                      style: TextStyle(color: EkaadhColors.soft, fontWeight: FontWeight.w700),
+                    label: Text(
+                      l10n.t('continue_as_guest'),
+                      style: const TextStyle(color: EkaadhColors.soft, fontWeight: FontWeight.w700),
                     ),
                   ),
                 )
@@ -83,24 +86,24 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 20),
               const Center(child: EkaadhLogo(height: 44)),
               const SizedBox(height: 28),
-              const Text(
-                'Welcome back',
-                style: TextStyle(
+              Text(
+                l10n.t('welcome_back'),
+                style: const TextStyle(
                   fontSize: 30,
                   fontWeight: FontWeight.w900,
                   color: EkaadhColors.dark,
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
-                'Sign in to your Ekaadh account',
-                style: TextStyle(color: EkaadhColors.muted, fontSize: 14),
+              Text(
+                l10n.t('sign_in_subtitle'),
+                style: const TextStyle(color: EkaadhColors.muted, fontSize: 14),
               ),
               const SizedBox(height: 28),
-              _label('Phone Number'),
+              _label(l10n.t('phone_number')),
               PhoneNumberField(controller: _loginController),
               const SizedBox(height: 16),
-              _label('Password'),
+              _label(l10n.t('password')),
               TextField(
                 controller: _passwordController,
                 obscureText: true,
@@ -128,7 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           height: 22,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
-                      : const Text('Sign In'),
+                      : Text(l10n.t('sign_in')),
                 ),
               ),
               const SizedBox(height: 20),
@@ -157,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                     textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
                   ),
-                  child: const Text('Create Account'),
+                  child: Text(l10n.t('create_account')),
                 ),
               ),
               const SizedBox(height: 16),
@@ -173,9 +176,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     );
                   },
-                  child: const Text(
-                    'Staff check-in portal',
-                    style: TextStyle(
+                  child: Text(
+                    l10n.t('staff_portal'),
+                    style: const TextStyle(
                       color: EkaadhColors.muted,
                       fontWeight: FontWeight.w700,
                       decoration: TextDecoration.underline,

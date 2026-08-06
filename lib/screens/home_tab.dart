@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
+import 'package:ekaadh_mobile/core/locale_scope.dart';
 import 'package:ekaadh_mobile/models/event_model.dart';
 import 'package:ekaadh_mobile/screens/event_detail_screen.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/services/event_service.dart';
+import 'package:ekaadh_mobile/widgets/design_network_image.dart';
 import 'package:ekaadh_mobile/widgets/ekaadh_logo.dart';
 
 class HomeTab extends StatefulWidget {
@@ -24,18 +26,22 @@ class HomeTab extends StatefulWidget {
 
 class _HomeTabState extends State<HomeTab> {
   final _service = EventService();
-  String _category = 'All';
+  String _category = 'all';
   List<EventModel> _featured = const [];
   List<EventModel> _upcoming = const [];
   bool _initialLoading = true;
   bool _upcomingLoading = false;
   Object? _error;
 
-  static const _cats = ['All', 'Music', 'Sports', 'Comedy', 'Tech', 'Food'];
+  static const _catKeys = ['all', 'Music', 'Sports', 'Comedy', 'Tech', 'Food'];
+
+  String get _categoryApiValue =>
+      _category == 'all' || _category == 'All' ? 'All' : _category;
 
   @override
   void initState() {
     super.initState();
+    _category = 'all';
     _load();
   }
 
@@ -57,7 +63,7 @@ class _HomeTabState extends State<HomeTab> {
         featured = await _service.list(featured: true);
       }
       final upcoming = await _service.list(
-        category: _category == 'All' ? null : _category,
+        category: _categoryApiValue == 'All' ? null : _categoryApiValue,
       );
       if (!mounted) return;
       setState(() {
@@ -107,6 +113,8 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Widget _buildBody() {
+    final l10n = LocaleScope.of(context);
+
     if (_initialLoading) {
       return const Center(child: CircularProgressIndicator(color: EkaadhColors.brand));
     }
@@ -117,18 +125,21 @@ class _HomeTabState extends State<HomeTab> {
           const Icon(Icons.wifi_off, size: 40, color: EkaadhColors.soft),
           const SizedBox(height: 12),
           Text(
-            'Could not load events.\n$_error',
+            '${l10n.t('could_not_load')}\n$_error',
             textAlign: TextAlign.center,
             style: const TextStyle(color: EkaadhColors.muted),
           ),
-          TextButton(onPressed: _load, child: const Text('Retry')),
+          TextButton(onPressed: _load, child: Text(l10n.t('retry'))),
         ],
       );
     }
 
+    String catLabel(String key) => key == 'all' ? l10n.t('all') : key;
+
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
+        // Compact ENG/SOM toggle in the home header as well.
         SliverToBoxAdapter(
           child: Container(
             color: Colors.white,
@@ -144,6 +155,30 @@ class _HomeTabState extends State<HomeTab> {
                         child: EkaadhLogo(height: 32),
                       ),
                     ),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: EkaadhColors.surface,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE2E8E4)),
+                      ),
+                      padding: const EdgeInsets.all(2),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _HomeLangChip(
+                            label: l10n.t('eng'),
+                            selected: l10n.code == 'en',
+                            onTap: () => l10n.setLocale('en'),
+                          ),
+                          _HomeLangChip(
+                            label: l10n.t('som'),
+                            selected: l10n.code == 'so',
+                            onTap: () => l10n.setLocale('so'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Container(
                       width: 40,
                       height: 40,
@@ -166,13 +201,13 @@ class _HomeTabState extends State<HomeTab> {
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: const Color(0xFFE2E8E4)),
                     ),
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Icon(Icons.search, size: 20, color: EkaadhColors.soft),
-                        SizedBox(width: 10),
+                        const Icon(Icons.search, size: 20, color: EkaadhColors.soft),
+                        const SizedBox(width: 10),
                         Text(
-                          'Search events, venues…',
-                          style: TextStyle(color: EkaadhColors.soft, fontSize: 14, fontWeight: FontWeight.w600),
+                          l10n.t('search_events'),
+                          style: const TextStyle(color: EkaadhColors.soft, fontSize: 14, fontWeight: FontWeight.w600),
                         ),
                       ],
                     ),
@@ -188,13 +223,13 @@ class _HomeTabState extends State<HomeTab> {
             child: ListView.separated(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
               scrollDirection: Axis.horizontal,
-              itemCount: _cats.length,
+              itemCount: _catKeys.length,
               separatorBuilder: (_, __) => const SizedBox(width: 8),
               itemBuilder: (_, i) {
-                final c = _cats[i];
+                final c = _catKeys[i];
                 final active = c == _category;
                 return ChoiceChip(
-                  label: Text(c),
+                  label: Text(catLabel(c)),
                   selected: active,
                   onSelected: (_) => _selectCategory(c),
                   selectedColor: EkaadhColors.brand,
@@ -212,10 +247,10 @@ class _HomeTabState extends State<HomeTab> {
           ),
         ),
         if (_featured.isNotEmpty) ...[
-          const SliverToBoxAdapter(
+          SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.fromLTRB(20, 18, 20, 10),
-              child: Text('Featured', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+              child: Text(l10n.t('featured'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
             ),
           ),
           SliverToBoxAdapter(
@@ -237,10 +272,10 @@ class _HomeTabState extends State<HomeTab> {
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            if (e.coverImage != null)
-                              Image.network(e.coverImage!, fit: BoxFit.cover)
-                            else
-                              const ColoredBox(color: Color(0xFFE2E8E4)),
+                            DesignNetworkImage(
+                              url: e.coverImage,
+                              fallbackColor: const Color(0xFFE2E8E4),
+                            ),
                             const DecoratedBox(
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
@@ -287,8 +322,8 @@ class _HomeTabState extends State<HomeTab> {
             padding: const EdgeInsets.fromLTRB(20, 22, 20, 10),
             child: Row(
               children: [
-                const Expanded(
-                  child: Text('Upcoming Events', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
+                Expanded(
+                  child: Text(l10n.t('upcoming_events'), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
                 ),
                 if (_upcomingLoading)
                   const SizedBox(
@@ -301,13 +336,13 @@ class _HomeTabState extends State<HomeTab> {
           ),
         ),
         if (_upcoming.isEmpty && !_upcomingLoading)
-          const SliverToBoxAdapter(
+          SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.fromLTRB(20, 24, 20, 40),
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
               child: Text(
-                'No events in this category.',
+                l10n.t('no_events_category'),
                 textAlign: TextAlign.center,
-                style: TextStyle(color: EkaadhColors.muted, fontWeight: FontWeight.w600),
+                style: const TextStyle(color: EkaadhColors.muted, fontWeight: FontWeight.w600),
               ),
             ),
           )
@@ -338,6 +373,7 @@ class _EventCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(20),
@@ -355,10 +391,10 @@ class _EventCard extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  if (event.coverImage != null)
-                    Image.network(event.coverImage!, fit: BoxFit.cover)
-                  else
-                    const ColoredBox(color: Color(0xFFE2E8E4)),
+                  DesignNetworkImage(
+                    url: event.coverImage,
+                    fallbackColor: const Color(0xFFE2E8E4),
+                  ),
                   Positioned(
                     top: 12,
                     left: 12,
@@ -405,13 +441,51 @@ class _EventCard extends StatelessWidget {
                     children: [
                       Text(event.eventTimeLabel ?? '', style: const TextStyle(color: EkaadhColors.soft, fontSize: 12)),
                       if (event.startingPrice != null)
-                        Text('From \$${event.startingPrice!.toStringAsFixed(0)}', style: const TextStyle(color: EkaadhColors.brand, fontWeight: FontWeight.w800, fontSize: 14)),
+                        Text(
+                          '${l10n.t('from_price')} \$${event.startingPrice!.toStringAsFixed(0)}',
+                          style: const TextStyle(color: EkaadhColors.brand, fontWeight: FontWeight.w800, fontSize: 14),
+                        ),
                     ],
                   ),
                 ],
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeLangChip extends StatelessWidget {
+  const _HomeLangChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? EkaadhColors.brand : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            color: selected ? Colors.white : EkaadhColors.muted,
+          ),
         ),
       ),
     );

@@ -12,6 +12,7 @@ class InvitationOverlayPreview extends StatelessWidget {
     this.maxWidth = 340,
     this.qrPayload,
     this.showQrChrome = true,
+    this.includeQr = true,
   });
 
   final TicketDesignOption design;
@@ -20,6 +21,8 @@ class InvitationOverlayPreview extends StatelessWidget {
   /// When set (ticket view), uses the real QR payload instead of the preview sample.
   final String? qrPayload;
   final bool showQrChrome;
+  /// When false, omit QR fields (for social share images).
+  final bool includeQr;
 
   String _textFor(InvitationDesignFieldOption field) {
     final value = fieldValues[field.fieldKey]?.trim();
@@ -155,7 +158,7 @@ class InvitationOverlayPreview extends StatelessWidget {
                             ),
                           ),
                       for (final field in design.previewFields)
-                        if (field.isQr)
+                        if (field.isQr && includeQr)
                           Positioned(
                             left: w * field.posX / 100,
                             top: h * field.posY / 100,

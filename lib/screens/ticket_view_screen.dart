@@ -1,7 +1,15 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:ekaadh_mobile/core/locale_scope.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
 import 'package:ekaadh_mobile/models/ticket_model.dart';
 import 'package:ekaadh_mobile/services/ticket_pdf_service.dart';
+import 'package:ekaadh_mobile/widgets/design_network_image.dart';
 import 'package:ekaadh_mobile/widgets/invitation_overlay_preview.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -16,6 +24,9 @@ class TicketViewScreen extends StatefulWidget {
 
 class _TicketViewScreenState extends State<TicketViewScreen> {
   bool _downloading = false;
+  bool _sharing = false;
+  bool _captureForShare = false;
+  final GlobalKey _shareKey = GlobalKey();
 
   TicketModel get ticket => widget.ticket;
 
@@ -26,7 +37,7 @@ class _TicketViewScreenState extends State<TicketViewScreen> {
       await TicketPdfService().download(ticket);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ticket PDF ready')),
+        SnackBar(content: Text(LocaleScope.of(context).t('ticket_pdf_ready'))),
       );
     } catch (e) {
       if (!mounted) return;
@@ -44,6 +55,63 @@ class _TicketViewScreenState extends State<TicketViewScreen> {
     }
   }
 
+  Future<void> _shareInvitationImage() async {
+    if (_sharing || !ticket.isOverlayInvite) return;
+    final l10n = LocaleScope.of(context);
+    setState(() {
+      _sharing = true;
+      _captureForShare = true;
+    });
+    try {
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      await WidgetsBinding.instance.endOfFrame;
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+
+      final boundary =
+          _shareKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) {
+        throw Exception(l10n.t('share_invitation_failed'));
+      }
+      final image = await boundary.toImage(pixelRatio: 3);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) {
+        throw Exception(l10n.t('share_invitation_failed'));
+      }
+      final bytes = byteData.buffer.asUint8List();
+      final dir = await getTemporaryDirectory();
+      final safeCode = ticket.ticketCode.replaceAll(RegExp(r'[^\w\-]+'), '_');
+      final file = File('${dir.path}/ekaadh-invitation-$safeCode.png');
+      await file.writeAsBytes(bytes, flush: true);
+
+      final title = ticket.eventTitle ?? l10n.t('invitation');
+      final text =
+          l10n.t('share_invitation_text').replaceAll(':title', title);
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'image/png')],
+        text: text,
+        subject: title,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceFirst('Exception: ', ''),
+            style: const TextStyle(color: Colors.white),
+          ),
+          backgroundColor: EkaadhColors.danger,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _sharing = false;
+          _captureForShare = false;
+        });
+      }
+    }
+  }
+
   Map<String, String> get _overlayValues {
     final design = ticket.invitationDesign!;
     final values = Map<String, String>.from(design.fieldValues);
@@ -56,6 +124,7 @@ class _TicketViewScreenState extends State<TicketViewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
     final thumb = ticket.displayImage;
 
     return Scaffold(
@@ -66,25 +135,43 @@ class _TicketViewScreenState extends State<TicketViewScreen> {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         title: Text(
-          ticket.isOverlayInvite ? 'Invitation' : 'Ticket',
+          ticket.isOverlayInvite ? l10n.t('invitation') : l10n.t('ticket'),
           style: const TextStyle(fontWeight: FontWeight.w900),
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          if (ticket.isOverlayInvite)
+            IconButton(
+              onPressed: _sharing ? null : _shareInvitationImage,
+              tooltip: l10n.t('share_invitation_image'),
+              icon: _sharing
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.ios_share),
+            ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 36),
         children: [
           if (ticket.isOverlayInvite)
             Center(
-              child: InvitationOverlayPreview(
-                design: ticket.invitationDesign!.toDesignOption(),
-                fieldValues: _overlayValues,
-                maxWidth: 420,
-                qrPayload: ticket.qrPayload,
-                showQrChrome: false,
+              child: RepaintBoundary(
+                key: _shareKey,
+                child: InvitationOverlayPreview(
+                  design: ticket.invitationDesign!.toDesignOption(),
+                  fieldValues: _overlayValues,
+                  maxWidth: 420,
+                  qrPayload: ticket.qrPayload,
+                  showQrChrome: false,
+                  includeQr: !_captureForShare,
+                ),
               ),
             )
           else
@@ -110,13 +197,13 @@ class _TicketViewScreenState extends State<TicketViewScreen> {
                           child: SizedBox(
                             width: 48,
                             height: 64,
-                            child: Image.network(thumb, fit: BoxFit.cover),
+                            child: DesignNetworkImage(url: thumb),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            ticket.eventTitle ?? 'Event',
+                            ticket.eventTitle ?? l10n.t('event'),
                             style: const TextStyle(
                               fontWeight: FontWeight.w900,
                               fontSize: 17,
@@ -131,7 +218,7 @@ class _TicketViewScreenState extends State<TicketViewScreen> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Text(
-                      ticket.eventTitle ?? 'Event',
+                      ticket.eventTitle ?? l10n.t('event'),
                       style: const TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 17,
@@ -184,7 +271,9 @@ class _TicketViewScreenState extends State<TicketViewScreen> {
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        ticket.status == 'valid' ? 'Valid' : ticket.status,
+                        ticket.status == 'valid'
+                            ? l10n.t('valid')
+                            : ticket.status,
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w800,
@@ -199,6 +288,30 @@ class _TicketViewScreenState extends State<TicketViewScreen> {
               ],
             ),
           ),
+          if (ticket.isOverlayInvite) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _sharing ? null : _shareInvitationImage,
+                icon: const Icon(Icons.ios_share, size: 18),
+                label: Text(
+                  _sharing
+                      ? l10n.t('sharing_invitation')
+                      : l10n.t('share_invitation_image'),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: EkaadhColors.brand,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  side: const BorderSide(color: Color(0xFFD8DCE8)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                  textStyle: const TextStyle(
+                      fontWeight: FontWeight.w800, fontSize: 15),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
@@ -212,15 +325,17 @@ class _TicketViewScreenState extends State<TicketViewScreen> {
                           strokeWidth: 2, color: Colors.white),
                     )
                   : const Icon(Icons.download_rounded, size: 18),
-              label: Text(_downloading ? 'Preparing PDF…' : 'Download PDF'),
+              label: Text(_downloading
+                  ? l10n.t('preparing_pdf')
+                  : l10n.t('download_pdf')),
               style: FilledButton.styleFrom(
                 backgroundColor: EkaadhColors.brand,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16)),
-                textStyle:
-                    const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                textStyle: const TextStyle(
+                    fontWeight: FontWeight.w800, fontSize: 15),
               ),
             ),
           ),
@@ -237,6 +352,7 @@ class _ClassicTicketCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -256,7 +372,7 @@ class _ClassicTicketCard extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 if (ticket.displayImage != null)
-                  Image.network(ticket.displayImage!, fit: BoxFit.cover)
+                  DesignNetworkImage(url: ticket.displayImage)
                 else
                   const ColoredBox(color: Color(0xFFE8E8EE)),
                 const DecoratedBox(
@@ -275,7 +391,7 @@ class _ClassicTicketCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(ticket.eventTitle ?? 'Event',
+                      Text(ticket.eventTitle ?? l10n.t('event'),
                           style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w900,
@@ -299,8 +415,8 @@ class _ClassicTicketCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Ticket Holder',
-                          style: TextStyle(
+                      Text(l10n.t('ticket_holder'),
+                          style: const TextStyle(
                               fontSize: 11,
                               color: EkaadhColors.soft,
                               fontWeight: FontWeight.w600)),
@@ -313,8 +429,8 @@ class _ClassicTicketCard extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    const Text('Type',
-                        style: TextStyle(
+                    Text(l10n.t('type'),
+                        style: const TextStyle(
                             fontSize: 11,
                             color: EkaadhColors.soft,
                             fontWeight: FontWeight.w600)),
@@ -327,7 +443,7 @@ class _ClassicTicketCard extends StatelessWidget {
             ),
           ),
           Text(
-            '${ticket.ticketCode} · ADMIT ONE',
+            '${ticket.ticketCode} · ${l10n.t('admit_one')}',
             style: const TextStyle(
               fontFamily: 'monospace',
               fontWeight: FontWeight.w800,
@@ -365,7 +481,7 @@ class _ClassicTicketCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Scan at entry · ${ticket.status == 'valid' ? 'Valid once only' : ticket.status}',
+                  '${l10n.t('scan_at_entry')} · ${ticket.status == 'valid' ? l10n.t('valid_once') : ticket.status}',
                   style: const TextStyle(
                       fontSize: 11,
                       color: EkaadhColors.soft,

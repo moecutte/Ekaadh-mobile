@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:ekaadh_mobile/core/api_config.dart';
+import 'package:ekaadh_mobile/core/locale_scope.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
 import 'package:ekaadh_mobile/models/event_model.dart';
 import 'package:ekaadh_mobile/screens/checkout_screen.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/services/event_service.dart';
+import 'package:ekaadh_mobile/widgets/design_network_image.dart';
 
 class EventDetailScreen extends StatefulWidget {
   const EventDetailScreen({super.key, required this.slug, this.auth});
@@ -24,8 +28,16 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     _future = EventService().show(widget.slug);
   }
 
+  Future<void> _shareEvent(EventModel e) async {
+    final l10n = LocaleScope.of(context);
+    final url = ApiConfig.eventShareUrl(e.slug);
+    final text = l10n.t('share_event_text').replaceAll(':title', e.title);
+    await Share.share('$text\n$url', subject: e.title);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
     return Scaffold(
       backgroundColor: Colors.white,
       body: FutureBuilder<EventModel>(
@@ -39,8 +51,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('${snap.error ?? 'Event not found'}'),
-                  TextButton(onPressed: () => Navigator.pop(context), child: const Text('Go back')),
+                  Text('${snap.error ?? l10n.t('event_not_found')}'),
+                  TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.t('go_back'))),
                 ],
               ),
             );
@@ -59,14 +71,23 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       icon: const Icon(Icons.chevron_left, color: Colors.white),
                       style: IconButton.styleFrom(backgroundColor: Colors.black38),
                     ),
+                    actions: [
+                      IconButton(
+                        onPressed: () => _shareEvent(e),
+                        tooltip: l10n.t('share_event'),
+                        icon: const Icon(Icons.ios_share, color: Colors.white),
+                        style: IconButton.styleFrom(backgroundColor: Colors.black38),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                     flexibleSpace: FlexibleSpaceBar(
                       background: Stack(
                         fit: StackFit.expand,
                         children: [
-                          if (e.coverImage != null)
-                            Image.network(e.coverImage!, fit: BoxFit.cover)
-                          else
-                            const ColoredBox(color: Color(0xFFC8D8CF)),
+                          DesignNetworkImage(
+                            url: e.coverImage,
+                            fallbackColor: const Color(0xFFC8D8CF),
+                          ),
                           const DecoratedBox(
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
@@ -96,20 +117,24 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       delegate: SliverChildListDelegate([
                         Text(e.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, height: 1.25)),
                         const SizedBox(height: 16),
-                        _InfoRow(icon: Icons.access_time, label: 'Date & Time', value: '${e.eventDateLabel ?? ''} at ${e.eventTimeLabel ?? ''}'),
+                        _InfoRow(
+                          icon: Icons.access_time,
+                          label: l10n.t('date_time'),
+                          value: '${e.eventDateLabel ?? ''} ${l10n.t('at_time')} ${e.eventTimeLabel ?? ''}',
+                        ),
                         const SizedBox(height: 12),
-                        _InfoRow(icon: Icons.location_on_outlined, label: 'Venue', value: [e.venue, e.city].whereType<String>().where((x) => x.isNotEmpty).join(', ')),
+                        _InfoRow(icon: Icons.location_on_outlined, label: l10n.t('venue'), value: [e.venue, e.city].whereType<String>().where((x) => x.isNotEmpty).join(', ')),
                         if (e.organizerName != null) ...[
                           const SizedBox(height: 12),
-                          _InfoRow(icon: Icons.business, label: 'Organizer', value: e.organizerName!),
+                          _InfoRow(icon: Icons.business, label: l10n.t('organizer'), value: e.organizerName!),
                         ],
                         const SizedBox(height: 22),
-                        const Text('About this event', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900)),
+                        Text(l10n.t('about_this_event'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900)),
                         const SizedBox(height: 8),
                         Text(e.description ?? '', style: const TextStyle(color: EkaadhColors.muted, height: 1.7, fontSize: 14)),
                         if (e.ticketTypes.isNotEmpty) ...[
                           const SizedBox(height: 24),
-                          const Text('Ticket types', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900)),
+                          Text(l10n.t('ticket_types'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900)),
                           const SizedBox(height: 10),
                           ...e.ticketTypes.map((t) => Container(
                                 margin: const EdgeInsets.only(bottom: 10),
@@ -155,7 +180,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Starting from', style: TextStyle(fontSize: 11, color: EkaadhColors.soft, fontWeight: FontWeight.w600)),
+                          Text(l10n.t('starting_from'), style: const TextStyle(fontSize: 11, color: EkaadhColors.soft, fontWeight: FontWeight.w600)),
                           Text(
                             e.startingPrice == null ? '—' : '\$${e.startingPrice!.toStringAsFixed(0)}',
                             style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: EkaadhColors.brand),
@@ -179,7 +204,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                             textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
                           ),
-                          child: const Text('Get Tickets'),
+                          child: Text(l10n.t('get_tickets')),
                         ),
                       ),
                     ],

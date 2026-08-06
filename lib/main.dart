@@ -3,11 +3,14 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
+import 'package:ekaadh_mobile/core/locale_service.dart';
+import 'package:ekaadh_mobile/core/locale_scope.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/screens/splash_screen.dart';
 import 'package:ekaadh_mobile/screens/onboarding_screen.dart';
 import 'package:ekaadh_mobile/screens/home_shell.dart';
 import 'package:ekaadh_mobile/screens/staff_login_screen.dart';
+import 'package:ekaadh_mobile/services/push_notification_service.dart';
 
 const _onboardingKey = 'onboarding_complete';
 
@@ -20,9 +23,10 @@ const _lightSystemUi = SystemUiOverlayStyle(
   systemNavigationBarIconBrightness: Brightness.dark,
 );
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(_lightSystemUi);
+  await PushNotificationService.init();
   runApp(const EkaadhApp());
 }
 
@@ -35,6 +39,7 @@ class EkaadhApp extends StatefulWidget {
 
 class _EkaadhAppState extends State<EkaadhApp> {
   final AuthService _auth = AuthService();
+  final LocaleService _locale = LocaleService();
   bool _booting = true;
   bool _signedIn = false;
   bool _onboardingDone = false;
@@ -55,10 +60,14 @@ class _EkaadhAppState extends State<EkaadhApp> {
     final prefs = await SharedPreferences.getInstance();
     _onboardingDone = prefs.getBool(_onboardingKey) ?? false;
 
+    await _locale.init();
     await _auth.init();
     if (_auth.token != null) {
       final ok = await _auth.fetchMe();
       _signedIn = ok;
+      if (ok) {
+        await PushNotificationService.syncToken(_auth);
+      }
     }
 
     // Match design reference splash duration (~2.2s).
@@ -83,9 +92,11 @@ class _EkaadhAppState extends State<EkaadhApp> {
 
   void _onSignedIn() {
     setState(() => _signedIn = true);
+    PushNotificationService.syncToken(_auth);
   }
 
   Future<void> _onSignOut() async {
+    await PushNotificationService.clearToken(_auth);
     await _auth.logout();
     if (mounted) {
       setState(() => _signedIn = false);
@@ -94,7 +105,8 @@ class _EkaadhAppState extends State<EkaadhApp> {
 
   @override
   Widget build(BuildContext context) {
-    Widget home;
+    // Built outside ListenableBuilder so locale toggles don't remount screens.
+    final Widget home;
     if (_booting) {
       home = const SplashScreen();
     } else if (!_onboardingDone) {
@@ -102,7 +114,6 @@ class _EkaadhAppState extends State<EkaadhApp> {
     } else if (_signedIn && _isStaff) {
       home = StaffHome(auth: _auth, onSignOut: _onSignOut);
     } else {
-      // Guests and signed-in customers land on Home — login is optional.
       home = HomeShell(
         auth: _auth,
         onSignedIn: _onSignedIn,
@@ -110,44 +121,55 @@ class _EkaadhAppState extends State<EkaadhApp> {
       );
     }
 
-    return MaterialApp(
-      title: 'Ekaadh',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: EkaadhColors.brand,
-          primary: EkaadhColors.brand,
-          surface: EkaadhColors.surface,
-        ),
-        scaffoldBackgroundColor: Colors.white,
-        textTheme: GoogleFonts.plusJakartaSansTextTheme(),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: EkaadhColors.dark,
-          elevation: 0,
-          systemOverlayStyle: _lightSystemUi,
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          hintStyle: EkaadhTextStyles.fieldHint,
-          filled: true,
-          fillColor: EkaadhColors.surface,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: EkaadhColors.fieldBorder),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: EkaadhColors.brand, width: 1.5),
-          ),
-        ),
+    return LocaleScope(
+      service: _locale,
+      child: ListenableBuilder(
+        listenable: _locale,
+        builder: (context, _) {
+          return MaterialApp(
+            title: 'Ekaadh',
+            debugShowCheckedModeBanner: false,
+            locale: Locale(_locale.code),
+            theme: ThemeData(
+              useMaterial3: true,
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: EkaadhColors.brand,
+                primary: EkaadhColors.brand,
+                surface: EkaadhColors.surface,
+              ),
+              scaffoldBackgroundColor: Colors.white,
+              textTheme: GoogleFonts.plusJakartaSansTextTheme(),
+              appBarTheme: const AppBarTheme(
+                backgroundColor: Colors.white,
+                foregroundColor: EkaadhColors.dark,
+                elevation: 0,
+                systemOverlayStyle: _lightSystemUi,
+              ),
+              inputDecorationTheme: InputDecorationTheme(
+                hintStyle: EkaadhTextStyles.fieldHint,
+                filled: true,
+                fillColor: EkaadhColors.surface,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(color: EkaadhColors.fieldBorder),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide:
+                      const BorderSide(color: EkaadhColors.brand, width: 1.5),
+                ),
+              ),
+            ),
+            home: home,
+          );
+        },
       ),
-      home: home,
     );
   }
 }

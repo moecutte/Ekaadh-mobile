@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:ekaadh_mobile/core/locale_scope.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
 import 'package:ekaadh_mobile/models/event_model.dart';
 import 'package:ekaadh_mobile/screens/event_detail_screen.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/services/event_service.dart';
+import 'package:ekaadh_mobile/widgets/design_network_image.dart';
 
 class SearchTab extends StatefulWidget {
   const SearchTab({super.key, this.auth});
@@ -180,6 +182,7 @@ class _SearchTabState extends State<SearchTab> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
     final categoryItems = ['All', ..._categories.where((c) => c != 'All')];
     final cityItems = ['All', ..._cities.where((c) => c != 'All')];
 
@@ -197,7 +200,7 @@ class _SearchTabState extends State<SearchTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Search', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
+                  Text(l10n.t('search'), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
                   const SizedBox(height: 14),
                   TextField(
                     controller: _controller,
@@ -216,7 +219,7 @@ class _SearchTabState extends State<SearchTab> {
                       fontWeight: FontWeight.w600,
                     ),
                     decoration: _grayFieldDecoration(
-                      hintText: 'Search events...',
+                      hintText: l10n.t('search_placeholder'),
                       radius: 16,
                       prefixIcon: const Icon(Icons.search, color: EkaadhColors.soft),
                       suffixIcon: _controller.text.isEmpty
@@ -250,7 +253,7 @@ class _SearchTabState extends State<SearchTab> {
                                 (c) => DropdownMenuItem(
                                   value: c,
                                   child: Text(
-                                    c == 'All' ? 'All Categories' : c,
+                                    c == 'All' ? l10n.t('all_categories') : c,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
@@ -283,7 +286,7 @@ class _SearchTabState extends State<SearchTab> {
                                 (c) => DropdownMenuItem(
                                   value: c,
                                   child: Text(
-                                    c == 'All' ? 'All Cities' : c,
+                                    c == 'All' ? l10n.t('all_cities') : c,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
@@ -311,7 +314,7 @@ class _SearchTabState extends State<SearchTab> {
                         ),
                         textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
                       ),
-                      child: const Text('Search'),
+                      child: Text(l10n.t('search')),
                     ),
                   ),
                   if (_showSuggestions && _controller.text.trim().isNotEmpty)
@@ -344,16 +347,16 @@ class _SearchTabState extends State<SearchTab> {
                         const SizedBox(height: 12),
                         Text(
                           _committedQuery.isNotEmpty
-                              ? 'No results for “$_committedQuery”'
-                              : 'No events match these filters',
+                              ? '${l10n.t('no_results_for')} “$_committedQuery”'
+                              : l10n.t('no_events_filters'),
                           textAlign: TextAlign.center,
                           style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
                         ),
                         const SizedBox(height: 6),
-                        const Text(
-                          'Try a different search, category, or city.',
+                        Text(
+                          l10n.t('try_different_search'),
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: EkaadhColors.muted),
+                          style: const TextStyle(color: EkaadhColors.muted),
                         ),
                       ],
                     );
@@ -365,8 +368,8 @@ class _SearchTabState extends State<SearchTab> {
                     itemBuilder: (_, i) {
                       if (i == 0) {
                         final label = !_hasActiveFilters
-                            ? 'Trending'
-                            : '${events.length} result${events.length == 1 ? '' : 's'}';
+                            ? l10n.t('trending')
+                            : '${events.length} ${events.length == 1 ? l10n.t('result') : l10n.t('results')}';
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 8, top: 4),
                           child: Text(
@@ -389,7 +392,7 @@ class _SearchTabState extends State<SearchTab> {
                             width: 56,
                             height: 56,
                             child: e.coverImage != null
-                                ? Image.network(e.coverImage!, fit: BoxFit.cover)
+                                ? DesignNetworkImage(url: e.coverImage)
                                 : const ColoredBox(color: Color(0xFFE2E8E4)),
                           ),
                         ),
@@ -444,6 +447,7 @@ class _SuggestionPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
     return Container(
       margin: const EdgeInsets.only(top: 8),
       decoration: BoxDecoration(
@@ -470,18 +474,18 @@ class _SuggestionPanel extends StatelessWidget {
               ? Padding(
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
                   child: Text(
-                    'No suggestions for “$query”',
+                    '${l10n.t('no_suggestions_for')} “$query”',
                     style: const TextStyle(color: EkaadhColors.muted, fontSize: 13),
                   ),
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(14, 10, 14, 4),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
                       child: Text(
-                        'SUGGESTIONS',
-                        style: TextStyle(
+                        l10n.t('suggestions').toUpperCase(),
+                        style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
                           color: EkaadhColors.soft,
@@ -521,7 +525,7 @@ class _SuggestionPanel extends StatelessWidget {
                                 ),
                               ),
                               IconButton(
-                                tooltip: 'Use this search',
+                                tooltip: l10n.t('use_this_search'),
                                 onPressed: () => onSelect(e),
                                 icon: const Icon(Icons.north_west, size: 16, color: EkaadhColors.soft),
                                 visualDensity: VisualDensity.compact,

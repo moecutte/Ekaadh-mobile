@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ekaadh_mobile/core/locale_scope.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
 import 'package:ekaadh_mobile/models/private_event_model.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
@@ -6,6 +7,7 @@ import 'package:ekaadh_mobile/services/private_event_service.dart';
 import 'package:ekaadh_mobile/screens/private_event_create_screen.dart';
 import 'package:ekaadh_mobile/screens/private_event_detail_screen.dart';
 import 'package:ekaadh_mobile/screens/private_event_pay_screen.dart';
+import 'package:ekaadh_mobile/widgets/design_network_image.dart';
 
 /// Tab: private invitation tickets the signed-in user created.
 class PrivateTicketsTab extends StatefulWidget {
@@ -15,12 +17,14 @@ class PrivateTicketsTab extends StatefulWidget {
     required this.onSignIn,
     required this.onRegister,
     this.active = true,
+    this.onHasEventsChanged,
   });
 
   final AuthService auth;
   final VoidCallback onSignIn;
   final VoidCallback onRegister;
   final bool active;
+  final ValueChanged<bool>? onHasEventsChanged;
 
   @override
   State<PrivateTicketsTab> createState() => _PrivateTicketsTabState();
@@ -62,6 +66,7 @@ class _PrivateTicketsTabState extends State<PrivateTicketsTab> {
         _service = PrivateEventService(token: widget.auth.token!);
         _load();
       } else {
+        widget.onHasEventsChanged?.call(false);
         setState(() {
           _service = null;
           _events = [];
@@ -87,6 +92,7 @@ class _PrivateTicketsTabState extends State<PrivateTicketsTab> {
         _events = events;
         _loading = false;
       });
+      widget.onHasEventsChanged?.call(events.isNotEmpty);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -136,27 +142,28 @@ class _PrivateTicketsTabState extends State<PrivateTicketsTab> {
   }
 
   Widget _guestBody() {
+    final l10n = LocaleScope.of(context);
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
       children: [
-        const Text(
-          'Tickets',
-          style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
+        Text(
+          l10n.t('tickets'),
+          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
         ),
         const SizedBox(height: 48),
         const Icon(Icons.confirmation_number_outlined,
             size: 56, color: EkaadhColors.soft),
         const SizedBox(height: 16),
-        const Text(
-          'Create private invitation tickets',
+        Text(
+          l10n.t('create_private_tickets'),
           textAlign: TextAlign.center,
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
         ),
         const SizedBox(height: 8),
-        const Text(
-          'Log in or create an account to design invitations, pay for capacity, and invite guests.',
+        Text(
+          l10n.t('private_tickets_guest_note'),
           textAlign: TextAlign.center,
-          style: TextStyle(color: EkaadhColors.muted, height: 1.45),
+          style: const TextStyle(color: EkaadhColors.muted, height: 1.45),
         ),
         const SizedBox(height: 28),
         FilledButton(
@@ -170,7 +177,7 @@ class _PrivateTicketsTabState extends State<PrivateTicketsTab> {
             ),
             textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
           ),
-          child: const Text('Log in'),
+          child: Text(l10n.t('log_in')),
         ),
         const SizedBox(height: 12),
         OutlinedButton(
@@ -184,7 +191,7 @@ class _PrivateTicketsTabState extends State<PrivateTicketsTab> {
             ),
             textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
           ),
-          child: const Text('Create account'),
+          child: Text(l10n.t('create_account')),
         ),
       ],
     );
@@ -220,6 +227,7 @@ class _PrivateTicketsTabState extends State<PrivateTicketsTab> {
   }
 
   Widget _signedInBody() {
+    final l10n = LocaleScope.of(context);
     final filtered = _filteredEvents;
 
     return Stack(
@@ -227,22 +235,22 @@ class _PrivateTicketsTabState extends State<PrivateTicketsTab> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 16, 20, 4),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
               child: Text(
-                'Tickets',
-                style: TextStyle(
+                l10n.t('tickets'),
+                style: const TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.4,
                 ),
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 0, 20, 10),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
               child: Text(
-                'Private invitations you created',
-                style: TextStyle(color: EkaadhColors.muted, fontSize: 13),
+                l10n.t('tickets_sub'),
+                style: const TextStyle(color: EkaadhColors.muted, fontSize: 13),
               ),
             ),
             if (_events.isNotEmpty)
@@ -252,17 +260,17 @@ class _PrivateTicketsTabState extends State<PrivateTicketsTab> {
                 child: Row(
                   children: [
                     _filterChip(
-                      label: 'All status',
+                      label: l10n.t('all_status'),
                       active: _statusFilter == 'all',
                       onTap: () => setState(() => _statusFilter = 'all'),
                     ),
                     _filterChip(
-                      label: 'Valid',
+                      label: l10n.t('valid'),
                       active: _statusFilter == 'valid',
                       onTap: () => setState(() => _statusFilter = 'valid'),
                     ),
                     _filterChip(
-                      label: 'Expired',
+                      label: l10n.t('expired'),
                       active: _statusFilter == 'expired',
                       onTap: () => setState(() => _statusFilter = 'expired'),
                     ),
@@ -293,34 +301,34 @@ class _PrivateTicketsTabState extends State<PrivateTicketsTab> {
                                 style: FilledButton.styleFrom(
                                   backgroundColor: EkaadhColors.brand,
                                 ),
-                                child: const Text('Retry'),
+                                child: Text(l10n.t('retry')),
                               ),
                             ],
                           )
                         : _events.isEmpty
                             ? ListView(
                                 padding: const EdgeInsets.all(24),
-                                children: const [
-                                  SizedBox(height: 72),
-                                  Icon(
+                                children: [
+                                  const SizedBox(height: 72),
+                                  const Icon(
                                     Icons.confirmation_number_outlined,
                                     size: 44,
                                     color: EkaadhColors.soft,
                                   ),
-                                  SizedBox(height: 14),
+                                  const SizedBox(height: 14),
                                   Text(
-                                    'No tickets yet',
+                                    l10n.t('no_tickets_yet'),
                                     textAlign: TextAlign.center,
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       fontWeight: FontWeight.w900,
                                       fontSize: 17,
                                     ),
                                   ),
-                                  SizedBox(height: 8),
+                                  const SizedBox(height: 8),
                                   Text(
-                                    'Create a private invitation package\nand invite guests by phone.',
+                                    l10n.t('create_private_package'),
                                     textAlign: TextAlign.center,
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       color: EkaadhColors.muted,
                                       height: 1.45,
                                     ),
@@ -330,27 +338,27 @@ class _PrivateTicketsTabState extends State<PrivateTicketsTab> {
                             : filtered.isEmpty
                                 ? ListView(
                                     padding: const EdgeInsets.all(24),
-                                    children: const [
-                                      SizedBox(height: 48),
-                                      Icon(
+                                    children: [
+                                      const SizedBox(height: 48),
+                                      const Icon(
                                         Icons.filter_list_off_rounded,
                                         size: 40,
                                         color: EkaadhColors.soft,
                                       ),
-                                      SizedBox(height: 12),
+                                      const SizedBox(height: 12),
                                       Text(
-                                        'No tickets match these filters',
+                                        l10n.t('no_tickets_filters'),
                                         textAlign: TextAlign.center,
-                                        style: TextStyle(
+                                        style: const TextStyle(
                                           fontWeight: FontWeight.w800,
                                           fontSize: 15,
                                         ),
                                       ),
-                                      SizedBox(height: 6),
+                                      const SizedBox(height: 6),
                                       Text(
-                                        'Try Valid or Expired.',
+                                        l10n.t('try_valid_expired'),
                                         textAlign: TextAlign.center,
-                                        style: TextStyle(
+                                        style: const TextStyle(
                                           color: EkaadhColors.muted,
                                         ),
                                       ),
@@ -381,9 +389,9 @@ class _PrivateTicketsTabState extends State<PrivateTicketsTab> {
             foregroundColor: Colors.white,
             elevation: 0,
             icon: const Icon(Icons.add_rounded),
-            label: const Text(
-              'Create',
-              style: TextStyle(fontWeight: FontWeight.w800),
+            label: Text(
+              l10n.t('create'),
+              style: const TextStyle(fontWeight: FontWeight.w800),
             ),
           ),
         ),
@@ -400,6 +408,7 @@ class _TicketListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
     final thumb = event.design?.previewImageUrl ?? event.coverImage;
     final meta = [
       if (event.eventDateLabel != null) event.eventDateLabel!,
@@ -427,7 +436,7 @@ class _TicketListTile extends StatelessWidget {
                   width: 52,
                   height: 68,
                   child: thumb != null
-                      ? Image.network(thumb, fit: BoxFit.cover)
+                      ? DesignNetworkImage(url: thumb)
                       : const ColoredBox(
                           color: EkaadhColors.brandLight,
                           child: Icon(
@@ -457,7 +466,7 @@ class _TicketListTile extends StatelessWidget {
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
-                            event.isPaid ? 'Paid' : 'Unpaid',
+                            event.isPaid ? l10n.t('paid') : l10n.t('unpaid'),
                             style: TextStyle(
                               color: event.isPaid
                                   ? const Color(0xFF047857)
@@ -480,7 +489,7 @@ class _TicketListTile extends StatelessWidget {
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
-                            event.isExpired ? 'Expired' : 'Valid',
+                            event.isExpired ? l10n.t('expired') : l10n.t('valid'),
                             style: TextStyle(
                               color: event.isExpired
                                   ? EkaadhColors.muted
@@ -526,8 +535,8 @@ class _TicketListTile extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       event.isPaid
-                          ? '${event.invited}/${event.capacity} invited · ${event.remaining} left'
-                          : 'Finish payment to invite guests',
+                          ? '${event.invited}/${event.capacity} ${l10n.t('invited_of')} · ${event.remaining} ${l10n.t('seats_left')}'
+                          : l10n.t('finish_payment_invite'),
                       style: TextStyle(
                         color: event.isPaid
                             ? EkaadhColors.brand

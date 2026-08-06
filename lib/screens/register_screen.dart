@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ekaadh_mobile/core/locale_scope.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/services/otp_service.dart';
@@ -42,8 +43,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _sendOtp() async {
+    final l10n = LocaleScope.of(context);
     if (!PhoneNumberField.hasLocalNumber(_phone.text)) {
-      setState(() => _error = 'Enter your phone number.');
+      setState(() => _error = l10n.t('enter_phone'));
       return;
     }
     setState(() {
@@ -60,7 +62,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _loading = false;
         _otpSent = true;
         _otpHint = result.debugCode != null
-            ? 'Testing code: ${result.debugCode}'
+            ? '${l10n.t('testing_code')}: ${result.debugCode}'
             : result.message;
       });
     } catch (e) {
@@ -73,13 +75,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _submit() async {
+    final l10n = LocaleScope.of(context);
     if (!_otpSent) {
       await _sendOtp();
       return;
     }
 
     if (_otp.text.trim().isEmpty) {
-      setState(() => _error = 'Enter the confirmation code.');
+      setState(() => _error = l10n.t('enter_confirmation_code'));
       return;
     }
 
@@ -98,7 +101,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         );
         token = verified.otpToken;
         if (token == null) {
-          throw Exception('Could not confirm phone.');
+          throw Exception(l10n.t('could_not_confirm_phone'));
         }
         _otpToken = token;
       }
@@ -132,6 +135,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -142,30 +146,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
               TextButton.icon(
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.chevron_left, color: Color(0xFF9CA3AF)),
-                label: const Text('Back', style: TextStyle(color: Color(0xFF9CA3AF), fontWeight: FontWeight.w700)),
+                label: Text(l10n.t('back'), style: const TextStyle(color: Color(0xFF9CA3AF), fontWeight: FontWeight.w700)),
               ),
               const SizedBox(height: 8),
               const Center(child: EkaadhLogo(height: 40)),
               const SizedBox(height: 20),
-              const Text(
-                'Create account',
-                style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: EkaadhColors.dark),
+              Text(
+                l10n.t('create_account'),
+                style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: EkaadhColors.dark),
               ),
               const SizedBox(height: 6),
-              const Text(
-                'Join Ekaadh and start discovering events',
-                style: TextStyle(color: EkaadhColors.muted, fontSize: 14),
+              Text(
+                l10n.t('create_account_subtitle'),
+                style: const TextStyle(color: EkaadhColors.muted, fontSize: 14),
               ),
               const SizedBox(height: 28),
-              _field('Full Name', _name, 'Amina Hassan'),
+              _field(l10n.t('full_name'), _name, 'Amina Hassan'),
               Padding(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'PHONE NUMBER',
-                      style: TextStyle(
+                    Text(
+                      l10n.t('phone_number').toUpperCase(),
+                      style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF9CA3AF),
@@ -177,11 +181,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ],
                 ),
               ),
-              _field('Password', _password, 'Min. 8 characters', obscure: true),
-              _field('Confirm Password', _confirm, 'Re-enter password', obscure: true),
+              _field(l10n.t('password'), _password, l10n.t('min_8_chars'), obscure: true),
+              _field(l10n.t('confirm_password'), _confirm, l10n.t('reenter_password'), obscure: true),
               if (_otpSent) ...[
                 const SizedBox(height: 4),
-                _field('Confirmation code', _otp, '123456', keyboard: TextInputType.number),
+                _field(l10n.t('confirmation_code'), _otp, '123456', keyboard: TextInputType.number),
                 if (_otpHint != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
@@ -192,7 +196,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 TextButton(
                   onPressed: _loading ? null : _sendOtp,
-                  child: const Text('Resend code', style: TextStyle(fontWeight: FontWeight.w700)),
+                  child: Text(l10n.t('resend_code'), style: const TextStyle(fontWeight: FontWeight.w700)),
                 ),
               ],
               if (_error != null) ...[
@@ -217,7 +221,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           height: 22,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
-                      : Text(_otpSent ? 'Verify & Create Account' : 'Send Confirmation Code'),
+                      : Text(_otpSent ? l10n.t('verify_create_account') : l10n.t('send_confirmation_code')),
                 ),
               ),
             ],

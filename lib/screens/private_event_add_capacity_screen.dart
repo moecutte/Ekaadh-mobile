@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:ekaadh_mobile/core/locale_scope.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
 import 'package:ekaadh_mobile/models/private_event_model.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/services/private_event_service.dart';
 import 'package:ekaadh_mobile/screens/private_event_pay_screen.dart';
+import 'package:ekaadh_mobile/widgets/design_network_image.dart';
 
 class PrivateEventAddCapacityScreen extends StatefulWidget {
   const PrivateEventAddCapacityScreen({
@@ -93,6 +95,7 @@ class _PrivateEventAddCapacityScreenState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
     final subtotal = _unit * _qty;
     final total = subtotal + _fee;
     final meta = [
@@ -104,9 +107,9 @@ class _PrivateEventAddCapacityScreenState
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
-          'Buy more tickets',
-          style: TextStyle(fontWeight: FontWeight.w900),
+        title: Text(
+          l10n.t('buy_more_tickets'),
+          style: const TextStyle(fontWeight: FontWeight.w900),
         ),
         backgroundColor: Colors.white,
         foregroundColor: EkaadhColors.dark,
@@ -125,7 +128,7 @@ class _PrivateEventAddCapacityScreenState
                   meta: meta,
                   thumb: _thumb,
                   trailing: Text(
-                    '\$${_unit.toStringAsFixed(2)} each',
+                    '\$${_unit.toStringAsFixed(2)} ${l10n.t('each')}',
                     style: const TextStyle(
                       color: EkaadhColors.brand,
                       fontWeight: FontWeight.w800,
@@ -142,9 +145,9 @@ class _PrivateEventAddCapacityScreenState
                   ),
                   child: Column(
                     children: [
-                      const Text(
-                        'How many more seats?',
-                        style: TextStyle(
+                      Text(
+                        l10n.t('how_many_more_seats'),
+                        style: const TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 15,
                         ),
@@ -181,16 +184,16 @@ class _PrivateEventAddCapacityScreenState
                       const SizedBox(height: 18),
                       const Divider(height: 1, color: Color(0xFFEEF0F4)),
                       const SizedBox(height: 14),
-                      _priceRow('Subtotal', subtotal),
+                      _priceRow(l10n.t('subtotal'), subtotal),
                       const SizedBox(height: 8),
-                      _priceRow('Service fee', _fee),
+                      _priceRow(l10n.t('service_fee'), _fee),
                       const SizedBox(height: 12),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
-                            'Total',
-                            style: TextStyle(
+                          Text(
+                            l10n.t('total'),
+                            style: const TextStyle(
                               fontWeight: FontWeight.w900,
                               fontSize: 16,
                             ),
@@ -247,7 +250,7 @@ class _PrivateEventAddCapacityScreenState
                             color: Colors.white,
                           ),
                         )
-                      : const Text('Continue to payment'),
+                      : Text(l10n.t('continue_to_payment')),
                 ),
               ],
             ),
@@ -332,7 +335,7 @@ class _TicketHeader extends StatelessWidget {
               width: 52,
               height: 68,
               child: thumb != null
-                  ? Image.network(thumb!, fit: BoxFit.cover)
+                  ? DesignNetworkImage(url: thumb)
                   : const ColoredBox(
                       color: EkaadhColors.brandLight,
                       child: Icon(
