@@ -9,41 +9,32 @@ flutter pub get
 flutter run
 ```
 
-API base URL is chosen automatically:
+By default the app talks to **production**: `https://ekaadh.com/api/v1`.
 
-- Chrome / localhost on this PC → `http://127.0.0.1:8000/api/v1`
-- Android emulator → `http://10.0.2.2:8000/api/v1`
-- **Flutter web on LAN** → uses the host in the browser address bar  
-  (open `http://YOUR_LAN_IP:8080` → API calls `http://YOUR_LAN_IP/Ekaadh-backend/public/api/v1`)
-
-Start the Laravel API first (from `C:\xampp\htdocs\Ekaadh-backend`). Needs **PHP 8.3+** (use `C:\php\php.exe`, not XAMPP’s 8.2). Prefer the CORS router so Chrome can load event images:
+Override for local Laravel:
 
 ```bash
-cd C:\xampp\htdocs\Ekaadh-backend
+# Android emulator → artisan on this PC
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000/api/v1
+
+# Physical phone / LAN → your PC IP
+flutter run --dart-define=API_BASE_URL=http://192.168.x.x:8000/api/v1
+```
+
+Start local Laravel only when using those overrides (from `Ekaadh-backend`). Needs **PHP 8.3+**:
+
+```bash
+cd C:\xampp\htdocs\Ekaadh\Ekaadh-backend
 C:\php\php.exe -S 127.0.0.1:8000 -t public public/router.php
 ```
 
-Or plain artisan (images still work in the app via HTML img fallback):
+Release APK (already defaults to ekaadh.com):
 
 ```bash
-C:\php\php.exe artisan serve --host=127.0.0.1 --port=8000
+flutter build apk --release
 ```
 
-Keep XAMPP **MySQL** running. Apache is optional unless you use the LAN/Apache path above.
-
-Access from another phone/laptop on the same Wi‑Fi:
-
-```bash
-flutter run -d web-server --web-hostname 0.0.0.0 --web-port 8080
-```
-
-Then open `http://192.168.x.x:8080` (this PC’s LAN IP).
-
-Production:
-
-```bash
-flutter build apk --dart-define=API_BASE_URL=https://your-domain.com/api/v1
-```
+Optional: still pass Firebase dart-defines for push (see [docs/PUSH_SETUP.md](docs/PUSH_SETUP.md)).
 
 ## Support
 

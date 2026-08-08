@@ -1,14 +1,14 @@
 import 'package:flutter/foundation.dart';
 
 class ApiConfig {
-  /// Local Laravel (`php artisan serve`) API root.
-  static const _localApi = 'http://127.0.0.1:8000/api/v1';
+  /// Production API (default for run/build when no override is passed).
+  static const _productionApi = 'https://ekaadh.com/api/v1';
 
   /// Path under a shared XAMPP/Apache host (no scheme/host).
   static const _apiPath = '/Ekaadh-backend/public/api/v1';
 
-  /// Override with:
-  /// `flutter run --dart-define=API_BASE_URL=http://192.168.1.10:8000/api/v1`
+  /// Override production with:
+  /// `flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000/api/v1`
   static const _envBase = String.fromEnvironment('API_BASE_URL');
 
   /// Optional LAN host for phones / LAN web when not using dart-define, e.g.
@@ -19,36 +19,33 @@ class ApiConfig {
   static String get baseUrl {
     if (_envBase.isNotEmpty) return _envBase.replaceAll(RegExp(r'/+$'), '');
 
-    // Flutter web (incl. web-server on 0.0.0.0): use the host the browser opened.
-    if (kIsWeb) {
-      return _webBaseUrl();
-    }
-
     if (_envHost.isNotEmpty) {
       return 'http://${_envHost.trim()}$_apiPath';
     }
 
-    // Android emulator → host machine loopback (artisan serve).
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8000/api/v1';
+    // Default: production.
+    // Local/LAN: pass API_BASE_URL or API_HOST (see above).
+    if (kIsWeb) {
+      return _webBaseUrl();
     }
 
-    // iOS simulator / desktop on the same machine as artisan serve.
-    return _localApi;
+    return _productionApi;
   }
 
   static String _webBaseUrl() {
     final page = Uri.base;
     final host = page.host;
-    // Chrome / localhost on this PC → artisan serve.
+    // Chrome / localhost on this PC → still use production unless overridden,
+    // so local web testing hits ekaadh.com by default.
     if (host.isEmpty || host == 'localhost' || host == '127.0.0.1') {
-      if (_envHost.isNotEmpty) {
-        return 'http://${_envHost.trim()}$_apiPath';
-      }
-      return _localApi;
+      return _productionApi;
+    }
+    // If the Flutter web app is hosted on the same domain as the API (or LAN),
+    // prefer that host’s Apache API path for non-production hosts.
+    if (host == 'ekaadh.com' || host == 'www.ekaadh.com') {
+      return _productionApi;
     }
     final scheme = page.scheme.isNotEmpty ? page.scheme : 'http';
-    // Phone/LAN: hit this machine’s Apache on :80 — do not reuse Flutter’s :8080.
     return '$scheme://$host$_apiPath';
   }
 
@@ -63,7 +60,6 @@ class ApiConfig {
   }
 
   /// Public website origin for shareable event links.
-  /// Falls back to production when the API host is local/LAN.
   static String get webOrigin {
     final origin = assetOrigin;
     final uri = Uri.tryParse(origin);

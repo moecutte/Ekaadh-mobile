@@ -9,7 +9,6 @@
       "args": [
         "-d",
         "android",
-        "--dart-define=API_BASE_URL=https://ekaadh.com/api/v1",
         "--dart-define=FIREBASE_API_KEY=AIzaSyDdzFV9IlyJlKUHxWSw6IP0ixi9YE5ahag",
         "--dart-define=FIREBASE_APP_ID=1:1041974530298:android:19a08f42603cd160a4b943",
         "--dart-define=FIREBASE_MESSAGING_SENDER_ID=1041974530298",

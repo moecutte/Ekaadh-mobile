@@ -40,6 +40,11 @@ android {
     }
 }
 
+// APK base name → Ekaadh-release.apk (not app-release.apk)
+base {
+    archivesName.set("Ekaadh")
+}
+
 flutter {
     source = "../.."
 }
