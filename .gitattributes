@@ -1,0 +1,8 @@
+# iOS / CocoaPods expect LF (Codemagic / macOS)
+ios/Podfile text eol=lf
+ios/**/*.swift text eol=lf
+ios/**/*.h text eol=lf
+ios/**/*.m text eol=lf
+ios/**/*.plist text eol=lf
+ios/**/*.pbxproj text eol=lf
+ios/**/*.xcconfig text eol=lf
