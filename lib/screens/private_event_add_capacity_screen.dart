@@ -6,6 +6,7 @@ import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/services/private_event_service.dart';
 import 'package:ekaadh_mobile/screens/private_event_pay_screen.dart';
 import 'package:ekaadh_mobile/widgets/design_network_image.dart';
+import 'package:ekaadh_mobile/core/user_facing_error.dart';
 
 class PrivateEventAddCapacityScreen extends StatefulWidget {
   const PrivateEventAddCapacityScreen({
@@ -88,7 +89,7 @@ class _PrivateEventAddCapacityScreenState
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = UserFacingError.message(e, t: LocaleScope.of(context).t);
       });
     }
   }

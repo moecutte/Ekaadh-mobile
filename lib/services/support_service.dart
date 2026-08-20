@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
+import 'package:ekaadh_mobile/core/api_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:ekaadh_mobile/core/api_config.dart';
@@ -90,9 +90,9 @@ class SupportService {
     final uri = Uri.parse('${ApiConfig.baseUrl}/support/faqs').replace(
       queryParameters: {'locale': locale},
     );
-    final res = await http.get(uri, headers: _headers);
+    final res = await ApiClient.get(uri, headers: _headers);
     if (res.statusCode != 200) {
-      throw Exception('Could not load FAQs');
+      throw Exception('Could not load FAQs. Please try again.');
     }
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     final list = body['faqs'] as List<dynamic>? ?? [];
@@ -117,13 +117,13 @@ class SupportService {
     final payload = <String, dynamic>{};
     if (guest != null) payload['guest_token'] = guest;
 
-    final res = await http.post(
+    final res = await ApiClient.post(
       Uri.parse('${ApiConfig.baseUrl}/support/conversation'),
       headers: _headers,
       body: jsonEncode(payload),
     );
     if (res.statusCode != 200) {
-      throw Exception('Could not start support chat');
+      throw Exception('Could not start support chat. Please try again.');
     }
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     final conversation = SupportConversation.fromJson(
@@ -148,9 +148,9 @@ class SupportService {
       '${ApiConfig.baseUrl}/support/conversations/$conversationId/messages',
     ).replace(queryParameters: params);
 
-    final res = await http.get(uri, headers: _headers);
+    final res = await ApiClient.get(uri, headers: _headers);
     if (res.statusCode != 200) {
-      throw Exception('Could not load messages');
+      throw Exception('Could not load messages. Please try again.');
     }
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     final list = body['messages'] as List<dynamic>? ?? [];
@@ -170,7 +170,7 @@ class SupportService {
     if (faqId != null) payload['faq_id'] = faqId;
     if (guest != null) payload['guest_token'] = guest;
 
-    final res = await http.post(
+    final res = await ApiClient.post(
       Uri.parse(
         '${ApiConfig.baseUrl}/support/conversations/$conversationId/messages',
       ),
@@ -178,7 +178,7 @@ class SupportService {
       body: jsonEncode(payload),
     );
     if (res.statusCode != 201) {
-      throw Exception('Could not send message');
+      throw Exception('Could not send message. Please try again.');
     }
     final decoded = jsonDecode(res.body) as Map<String, dynamic>;
     return SupportMessage.fromJson(decoded['message'] as Map<String, dynamic>);

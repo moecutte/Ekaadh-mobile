@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ekaadh_mobile/core/locale_scope.dart';
+import 'package:ekaadh_mobile/core/user_facing_error.dart';
 import 'package:flutter/services.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
 import 'package:ekaadh_mobile/models/private_event_model.dart';
@@ -7,7 +8,7 @@ import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/services/private_event_service.dart';
 import 'package:ekaadh_mobile/screens/private_event_send_invites_screen.dart';
 import 'package:ekaadh_mobile/widgets/design_network_image.dart';
-import 'package:ekaadh_mobile/widgets/phone_number_field.dart';
+import 'package:ekaadh_mobile/widgets/ekaadh_toast.dart';
 
 class PrivateEventInvitationsScreen extends StatefulWidget {
   const PrivateEventInvitationsScreen({
@@ -82,7 +83,7 @@ class _PrivateEventInvitationsScreenState
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = UserFacingError.message(e, t: LocaleScope.of(context).t);
         _loading = false;
       });
     }
@@ -103,22 +104,90 @@ class _PrivateEventInvitationsScreenState
   }
 
   Future<void> _resend(InvitationModel invite) async {
+    final channel = await _pickChannel(invite.deliveryChannel);
+    if (channel == null || !mounted) return;
     try {
       await _service.resendInvitation(
         eventId: widget.eventId,
         invitationId: invite.id,
+        channel: channel,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(LocaleScope.of(context).t('invitation_resent'))),
-      );
+      await EkaadhToast.success(context, message: LocaleScope.of(context).t('invitation_resent'));
       _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      await EkaadhToast.error(
+        context,
+        message: UserFacingError.message(e, t: LocaleScope.of(context).t),
       );
     }
+  }
+
+  Future<String?> _pickChannel(String? current) async {
+    return showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) {
+        final l10n = LocaleScope.of(ctx);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.t('resend_via'),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  l10n.t('invite_channel_hint'),
+                  style: const TextStyle(
+                    color: EkaadhColors.muted,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                ListTile(
+                  leading: Icon(
+                    Icons.chat_rounded,
+                    color: current == 'whatsapp'
+                        ? EkaadhColors.brand
+                        : EkaadhColors.muted,
+                  ),
+                  title: Text(
+                    l10n.t('invite_channel_whatsapp'),
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  onTap: () => Navigator.pop(ctx, 'whatsapp'),
+                ),
+                ListTile(
+                  leading: Icon(
+                    Icons.sms_rounded,
+                    color: current == 'sms'
+                        ? EkaadhColors.brand
+                        : EkaadhColors.muted,
+                  ),
+                  title: Text(
+                    l10n.t('invite_channel_sms'),
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  onTap: () => Navigator.pop(ctx, 'sms'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _revoke(InvitationModel invite) async {
@@ -159,53 +228,9 @@ class _PrivateEventInvitationsScreenState
       _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-      );
-    }
-  }
-
-  Future<void> _editPhone(InvitationModel invite) async {
-    final controller = TextEditingController(
-      text: invite.guestPhone.replaceFirst('+252', ''),
-    );
-    final phone = await showDialog<String>(
-      context: context,
-      builder: (ctx) {
-        final l10n = LocaleScope.of(ctx);
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          title: Text(
-            l10n.t('update_phone'),
-            style: const TextStyle(fontWeight: FontWeight.w900),
-          ),
-          content: PhoneNumberField(controller: controller),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(l10n.t('cancel')),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-              child: Text(l10n.t('save_resend')),
-            ),
-          ],
-        );
-      },
-    );
-    if (phone == null || phone.isEmpty) return;
-    try {
-      await _service.updatePhone(
-        eventId: widget.eventId,
-        invitationId: invite.id,
-        phone: PhoneNumberField.fullNumber(phone),
-      );
-      _load();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      await EkaadhToast.error(
+        context,
+        message: UserFacingError.message(e, t: LocaleScope.of(context).t),
       );
     }
   }
@@ -512,17 +537,15 @@ class _PrivateEventInvitationsScreenState
           ),
           const SizedBox(height: 10),
           Text(
-            '${invite.quantity} × ${invite.ticketTypeName ?? l10n.t('ticket_singular')} · SMS ${invite.smsStatus}',
+            '${invite.quantity} × ${invite.ticketTypeName ?? l10n.t('ticket_singular')} · ${invite.deliveryLabel(l10n.t)}',
             style: const TextStyle(fontSize: 12, color: EkaadhColors.soft),
           ),
           if (invite.invitationUrl != null) ...[
             const SizedBox(height: 8),
             InkWell(
-              onTap: () {
+              onTap: () async {
                 Clipboard.setData(ClipboardData(text: invite.invitationUrl!));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(l10n.t('invitation_link_copied'))),
-                );
+                await EkaadhToast.success(context, message: l10n.t('invitation_link_copied'));
               },
               borderRadius: BorderRadius.circular(10),
               child: Container(
@@ -570,11 +593,6 @@ class _PrivateEventInvitationsScreenState
                 _ActionChip(
                   label: l10n.t('resend'),
                   onTap: () => _resend(invite),
-                ),
-                const SizedBox(width: 6),
-                _ActionChip(
-                  label: l10n.t('phone'),
-                  onTap: () => _editPhone(invite),
                 ),
                 const SizedBox(width: 6),
                 _ActionChip(

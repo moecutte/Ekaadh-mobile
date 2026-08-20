@@ -34,7 +34,9 @@ Release APK (already defaults to ekaadh.com):
 flutter build apk --release
 ```
 
-Optional: still pass Firebase dart-defines for push (see [docs/PUSH_SETUP.md](docs/PUSH_SETUP.md)).
+Android release signing: copy `android/key.properties.example` to `android/key.properties` and point it at your upload keystore. Without that file, local `--release` still uses the debug keystore so `flutter run --release` works.
+
+Push: Android release uses `google-services.json`. Optional dart-defines still override it (see [docs/PUSH_SETUP.md](docs/PUSH_SETUP.md)).
 
 ## Support
 
@@ -42,7 +44,7 @@ Profile → **Support** opens in-app FAQ and chat (same backend as the website w
 
 ## Push notifications
 
-See [docs/PUSH_SETUP.md](docs/PUSH_SETUP.md). Without Firebase dart-defines the app runs normally and skips FCM.
+See [docs/PUSH_SETUP.md](docs/PUSH_SETUP.md). Android release includes Firebase from `google-services.json`. iOS still needs an `GoogleService-Info.plist` / dart-defines.
 
 ## Brand
 
@@ -50,4 +52,4 @@ Colors match the web app brand (`#323891`) — see `lib/core/theme.dart`.
 
 ## Staff check-in
 
-Login screen → **Staff check-in portal** → `staff@ekaadh.com` / `password` → select event → scan QR.
+Login screen → **Staff check-in portal**. Use a staff account created in Admin (never seed demo users on production).

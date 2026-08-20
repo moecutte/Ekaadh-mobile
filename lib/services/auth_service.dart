@@ -1,42 +1,46 @@
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ekaadh_mobile/core/api_client.dart';
 import 'package:ekaadh_mobile/core/api_config.dart';
 import 'package:ekaadh_mobile/models/user_model.dart';
 
 class AuthService {
   static const _tokenKey = 'ekaadh_token';
+  static const _storage = FlutterSecureStorage();
 
   String? token;
   UserModel? user;
 
   Future<void> init() async {
+    token = await _storage.read(key: _tokenKey);
+    if (token != null && token!.isNotEmpty) return;
+
     final prefs = await SharedPreferences.getInstance();
-    token = prefs.getString(_tokenKey);
+    final legacy = prefs.getString(_tokenKey);
+    if (legacy == null || legacy.isEmpty) return;
+    await _storage.write(key: _tokenKey, value: legacy);
+    await prefs.remove(_tokenKey);
+    token = legacy;
   }
 
   Future<void> _persistToken(String? value) async {
-    final prefs = await SharedPreferences.getInstance();
     if (value == null) {
-      await prefs.remove(_tokenKey);
+      await _storage.delete(key: _tokenKey);
     } else {
-      await prefs.setString(_tokenKey, value);
+      await _storage.write(key: _tokenKey, value: value);
     }
     token = value;
   }
 
-  Map<String, String> get _headers => {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
-      };
+  Map<String, String> get _headers => ApiClient.jsonHeaders(token: token);
 
   Future<String?> login({
     required String login,
     required String password,
   }) async {
-    final response = await http.post(
+    final response = await ApiClient.post(
       Uri.parse('${ApiConfig.baseUrl}/auth/login'),
       headers: _headers,
       body: jsonEncode({
@@ -46,7 +50,7 @@ class AuthService {
       }),
     );
 
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = ApiClient.decode(response);
     if (response.statusCode >= 200 && response.statusCode < 300) {
       await _persistToken(body['token'] as String);
       user = UserModel.fromJson(body['user'] as Map<String, dynamic>);
@@ -71,20 +75,20 @@ class AuthService {
     required String otpToken,
     String? email,
   }) async {
-    final response = await http.post(
+    final response = await ApiClient.post(
       Uri.parse('${ApiConfig.baseUrl}/auth/register'),
       headers: _headers,
       body: jsonEncode({
         'name': name,
         'phone': phone,
-        if (email != null && email.isNotEmpty) 'email': email,
         'password': password,
         'password_confirmation': passwordConfirmation,
         'otp_token': otpToken,
+        if (email != null && email.isNotEmpty) 'email': email,
       }),
     );
 
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = ApiClient.decode(response);
     if (response.statusCode >= 200 && response.statusCode < 300) {
       await _persistToken(body['token'] as String);
       user = UserModel.fromJson(body['user'] as Map<String, dynamic>);
@@ -103,12 +107,12 @@ class AuthService {
 
   Future<bool> fetchMe() async {
     if (token == null) return false;
-    final response = await http.get(
+    final response = await ApiClient.get(
       Uri.parse('${ApiConfig.baseUrl}/auth/me'),
       headers: _headers,
     );
     if (response.statusCode == 200) {
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final body = ApiClient.decode(response);
       user = UserModel.fromJson(body['user'] as Map<String, dynamic>);
       return true;
     }
@@ -120,21 +124,22 @@ class AuthService {
   Future<String?> updateProfile({
     required String name,
     String? email,
+    bool? pushNotificationsEnabled,
   }) async {
     if (token == null) return 'Sign in to update your profile.';
 
-    final response = await http.put(
+    final response = await ApiClient.put(
       Uri.parse('${ApiConfig.baseUrl}/auth/profile'),
       headers: _headers,
       body: jsonEncode({
         'name': name,
         if (email != null) 'email': email,
+        if (pushNotificationsEnabled != null)
+          'push_notifications_enabled': pushNotificationsEnabled,
       }),
     );
 
-    final body = response.body.isNotEmpty
-        ? jsonDecode(response.body) as Map<String, dynamic>
-        : <String, dynamic>{};
+    final body = ApiClient.decode(response);
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (body['user'] is Map<String, dynamic>) {
@@ -160,7 +165,7 @@ class AuthService {
   }) async {
     if (token == null) return 'Sign in to change your password.';
 
-    final response = await http.post(
+    final response = await ApiClient.post(
       Uri.parse('${ApiConfig.baseUrl}/auth/password'),
       headers: _headers,
       body: jsonEncode({
@@ -170,9 +175,7 @@ class AuthService {
       }),
     );
 
-    final body = response.body.isNotEmpty
-        ? jsonDecode(response.body) as Map<String, dynamic>
-        : <String, dynamic>{};
+    final body = ApiClient.decode(response);
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return null;
@@ -188,10 +191,37 @@ class AuthService {
     return body['message']?.toString() ?? 'Could not update password';
   }
 
+  Future<String?> deleteAccount({required String password}) async {
+    if (token == null) return 'Sign in to delete your account.';
+
+    final response = await ApiClient.delete(
+      Uri.parse('${ApiConfig.baseUrl}/auth/account'),
+      headers: _headers,
+      body: jsonEncode({'password': password}),
+    );
+
+    final body = ApiClient.decode(response);
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      await _persistToken(null);
+      user = null;
+      return null;
+    }
+
+    if (body['errors'] is Map) {
+      final errors = body['errors'] as Map<String, dynamic>;
+      final first = errors.values.first;
+      if (first is List && first.isNotEmpty) {
+        return first.first.toString();
+      }
+    }
+    return body['message']?.toString() ?? 'Could not delete account';
+  }
+
   Future<void> logout() async {
     try {
       if (token != null) {
-        await http.post(
+        await ApiClient.post(
           Uri.parse('${ApiConfig.baseUrl}/auth/logout'),
           headers: _headers,
         );

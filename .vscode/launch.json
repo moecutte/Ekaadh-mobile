@@ -17,6 +17,17 @@
       ]
     },
     {
+      "name": "Ekaadh Chrome (local API)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": [
+        "-d",
+        "chrome",
+        "--dart-define=API_BASE_URL=http://127.0.0.1:8000/api/v1"
+      ]
+    },
+    {
       "name": "Ekaadh Android (local API + FCM)",
       "request": "launch",
       "type": "dart",

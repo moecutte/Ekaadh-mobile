@@ -41,6 +41,8 @@ class TicketModel {
   bool get isOverlayInvite =>
       isPrivate && (invitationDesign?.isOverlay ?? false);
 
+  bool get isDesignedInvite => isPrivate && invitationDesign != null;
+
   /// Cover / invitation artwork for list thumbnails.
   String? get displayImage =>
       invitationDesign?.resolvedThumbnailUrl ??
@@ -81,6 +83,13 @@ class TicketInvitationDesign {
   final String text;
   final String muted;
   final String accent;
+  final String border;
+  final String headerFrom;
+  final String headerTo;
+  final String ornament;
+  final String badge;
+  final String inviteLine;
+  final String requestLine;
   final List<InvitationDesignFieldOption> fields;
   final Map<String, String> fieldValues;
 
@@ -92,6 +101,13 @@ class TicketInvitationDesign {
     required this.text,
     required this.muted,
     required this.accent,
+    this.border = '#e2e8f0',
+    this.headerFrom = '#0f1a2e',
+    this.headerTo = '#323891',
+    this.ornament = '',
+    this.badge = '',
+    this.inviteLine = '',
+    this.requestLine = '',
     required this.fields,
     required this.fieldValues,
   });
@@ -114,16 +130,16 @@ class TicketInvitationDesign {
       label: '',
       description: '',
       accent: accent,
-      headerFrom: '#0f1a2e',
-      headerTo: '#323891',
+      headerFrom: headerFrom,
+      headerTo: headerTo,
       cardBg: cardBg,
       text: text,
       muted: muted,
-      border: '#e2e8f0',
-      ornament: '',
-      badge: '',
-      inviteLine: '',
-      requestLine: '',
+      border: border,
+      ornament: ornament,
+      badge: badge,
+      inviteLine: inviteLine,
+      requestLine: requestLine,
       graphicUrl: graphicUrl,
       thumbnailUrl: thumbnailUrl ?? graphicUrl,
       renderMode: renderMode,
@@ -134,7 +150,7 @@ class TicketInvitationDesign {
   factory TicketInvitationDesign.fromJson(Map<String, dynamic> json) {
     final rawValues = json['field_values'] as Map<String, dynamic>? ?? {};
     return TicketInvitationDesign(
-      renderMode: json['render_mode'] as String? ?? 'overlay',
+      renderMode: json['render_mode'] as String? ?? 'blade',
       graphicUrl: json['graphic_url'] as String?,
       thumbnailUrl:
           json['thumbnail_url'] as String? ?? json['graphic_url'] as String?,
@@ -142,6 +158,13 @@ class TicketInvitationDesign {
       text: json['text'] as String? ?? '#0f1a2e',
       muted: json['muted'] as String? ?? '#64748b',
       accent: json['accent'] as String? ?? '#323891',
+      border: json['border'] as String? ?? '#e2e8f0',
+      headerFrom: json['header_from'] as String? ?? '#0f1a2e',
+      headerTo: json['header_to'] as String? ?? '#323891',
+      ornament: json['ornament'] as String? ?? '',
+      badge: json['badge'] as String? ?? '',
+      inviteLine: json['invite_line'] as String? ?? '',
+      requestLine: json['request_line'] as String? ?? '',
       fields: (json['fields'] as List<dynamic>? ?? [])
           .map((e) => InvitationDesignFieldOption.fromJson(e as Map<String, dynamic>))
           .toList(),

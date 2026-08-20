@@ -6,6 +6,11 @@ import 'package:ekaadh_mobile/models/private_event_model.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/services/private_event_service.dart';
 import 'package:ekaadh_mobile/screens/private_event_detail_screen.dart';
+import 'package:ekaadh_mobile/core/user_facing_error.dart';
+import 'package:ekaadh_mobile/widgets/operator_logos.dart';
+import 'package:ekaadh_mobile/widgets/phone_number_field.dart';
+import 'package:ekaadh_mobile/widgets/wallet_pin_dialog.dart';
+import 'package:ekaadh_mobile/widgets/ekaadh_toast.dart';
 
 class PrivateEventPayScreen extends StatefulWidget {
   const PrivateEventPayScreen({
@@ -27,10 +32,12 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
   late final PrivateEventService _service;
   PrivateEventModel? _event;
   OrderModel? _order;
-  String _method = 'zaad';
+  String _method = 'waafipay';
   bool _loading = true;
   bool _paying = false;
   String? _error;
+  bool _payFailed = false;
+  final TextEditingController _chargePhone = TextEditingController();
 
   @override
   void initState() {
@@ -40,10 +47,17 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
     _load();
   }
 
+  @override
+  void dispose() {
+    _chargePhone.dispose();
+    super.dispose();
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
       _error = null;
+      _payFailed = false;
     });
     try {
       final event = await _service.show(widget.eventId);
@@ -71,26 +85,49 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = UserFacingError.message(e, t: LocaleScope.of(context).t);
         _loading = false;
       });
     }
   }
 
   Future<void> _pay() async {
+    final l10n = LocaleScope.of(context);
+    final sandbox = _event?.paymentSandbox == true;
+    String? chargePhone;
+    if (sandbox) {
+      if (!PhoneNumberField.hasLocalNumber(_chargePhone.text)) {
+        setState(() => _error = l10n.t('sandbox_charge_phone_required'));
+        return;
+      }
+      chargePhone = PhoneNumberField.fullNumber(_chargePhone.text);
+    }
+
+    String? walletPin;
+    if (sandbox) {
+      walletPin = await showWalletPinDialog(context);
+      if (!mounted || walletPin == null || walletPin.isEmpty) return;
+    }
+
     setState(() {
       _paying = true;
       _error = null;
+      _payFailed = false;
     });
     try {
       final result = await _service.pay(
         eventId: widget.eventId,
         paymentMethod: _method,
+        locale: LocaleScope.of(context).code,
+        walletPin: walletPin,
+        buyerPhone: chargePhone,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(LocaleScope.of(context).t('payment_successful_short'))),
+      await EkaadhToast.success(
+        context,
+        message: LocaleScope.of(context).t('payment_successful_short'),
       );
+      if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
           builder: (_) => PrivateEventDetailScreen(
@@ -104,7 +141,8 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
       if (!mounted) return;
       setState(() {
         _paying = false;
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _payFailed = true;
+        _error = UserFacingError.message(e, t: LocaleScope.of(context).t);
       });
     }
   }
@@ -199,6 +237,48 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    if (_event?.paymentSandbox == true) ...[
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFFBEB),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFFDE68A)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'WaafiPay sandbox',
+                              style: TextStyle(fontWeight: FontWeight.w900),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              l10n.t('wallet_pin_test_hint'),
+                              style: const TextStyle(fontSize: 12, color: EkaadhColors.muted, height: 1.4),
+                            ),
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                for (final wallet in _event!.testWallets)
+                                  ActionChip(
+                                    label: Text('${wallet.brand} · ${wallet.local}'),
+                                    onPressed: () => setState(() => _chargePhone.text = wallet.local),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            PhoneNumberField(
+                              controller: _chargePhone,
+                              hint: '611111111',
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -220,9 +300,40 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
                           const SizedBox(height: 10),
                           Row(
                             children: [
-                              Expanded(child: _methodChip('zaad', 'Zaad')),
+                              const Expanded(
+                                child: _PrivatePayMethod(
+                                  selected: true,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      OperatorLogos(height: 18),
+                                      SizedBox(height: 8),
+                                      Text('WaafiPay', style: TextStyle(fontWeight: FontWeight.w800)),
+                                    ],
+                                  ),
+                                ),
+                              ),
                               const SizedBox(width: 10),
-                              Expanded(child: _methodChip('edahab', 'eDahab')),
+                              Expanded(
+                                child: _PrivatePayMethod(
+                                  selected: false,
+                                  onTap: () {
+                                    EkaadhToast.error(context, message: l10n.t('edahab_unavailable'));
+                                  },
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Image.asset(
+                                        'assets/images/somtel-logo.png',
+                                        height: 22,
+                                        fit: BoxFit.contain,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      const Text('eDahab', style: TextStyle(fontWeight: FontWeight.w800)),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ],
@@ -230,7 +341,21 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
                     ),
                     if (_error != null) ...[
                       const SizedBox(height: 12),
-                      Text(_error!, style: const TextStyle(color: EkaadhColors.danger)),
+                      Text(
+                        _error!,
+                        style: const TextStyle(
+                          color: EkaadhColors.danger,
+                          fontWeight: FontWeight.w600,
+                          height: 1.45,
+                        ),
+                      ),
+                      if (_payFailed) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          l10n.t('payment_failed_hint'),
+                          style: const TextStyle(color: EkaadhColors.muted, height: 1.4),
+                        ),
+                      ],
                     ],
                     const SizedBox(height: 20),
                     SizedBox(
@@ -261,14 +386,27 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
                 ),
     );
   }
+}
 
-  Widget _methodChip(String value, String label) {
-    final selected = _method == value;
+class _PrivatePayMethod extends StatelessWidget {
+  const _PrivatePayMethod({
+    required this.selected,
+    required this.child,
+    this.onTap,
+  });
+
+  final bool selected;
+  final Widget child;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
     return InkWell(
-      onTap: () => setState(() => _method = value),
+      onTap: onTap,
       borderRadius: BorderRadius.circular(14),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
           color: selected ? EkaadhColors.brandLight : EkaadhColors.surface,
           borderRadius: BorderRadius.circular(14),
@@ -277,14 +415,7 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
             width: selected ? 1.5 : 1,
           ),
         ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            color: selected ? EkaadhColors.brand : EkaadhColors.dark,
-          ),
-        ),
+        child: child,
       ),
     );
   }

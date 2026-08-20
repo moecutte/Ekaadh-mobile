@@ -1,6 +1,7 @@
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
+import 'package:ekaadh_mobile/core/api_client.dart';
 import 'package:ekaadh_mobile/core/api_config.dart';
 import 'package:ekaadh_mobile/models/order_model.dart';
 import 'package:ekaadh_mobile/models/private_event_model.dart';
@@ -17,7 +18,7 @@ class PrivateEventService {
       };
 
   Future<PrivateEventMeta> meta() async {
-    final response = await http.get(
+    final response = await ApiClient.get(
       Uri.parse('${ApiConfig.baseUrl}/private-events/meta'),
       headers: _headers,
     );
@@ -29,7 +30,7 @@ class PrivateEventService {
   }
 
   Future<List<PrivateEventModel>> list() async {
-    final response = await http.get(
+    final response = await ApiClient.get(
       Uri.parse('${ApiConfig.baseUrl}/private-events'),
       headers: _headers,
     );
@@ -44,7 +45,7 @@ class PrivateEventService {
   }
 
   Future<PrivateEventModel> show(int eventId) async {
-    final response = await http.get(
+    final response = await ApiClient.get(
       Uri.parse('${ApiConfig.baseUrl}/private-events/$eventId'),
       headers: _headers,
     );
@@ -70,7 +71,7 @@ class PrivateEventService {
     String? eventDate,
     String? eventTime,
   }) async {
-    final response = await http.post(
+    final response = await ApiClient.post(
       Uri.parse('${ApiConfig.baseUrl}/private-events'),
       headers: _headers,
       body: jsonEncode({
@@ -103,13 +104,21 @@ class PrivateEventService {
     required int eventId,
     required String paymentMethod,
     bool forceFail = false,
+    String? locale,
+    String? walletPin,
+    String? buyerPhone,
   }) async {
-    final response = await http.post(
+    final response = await ApiClient.post(
       Uri.parse('${ApiConfig.baseUrl}/private-events/$eventId/pay'),
-      headers: _headers,
+      headers: {
+        ..._headers,
+        if (locale != null && locale.isNotEmpty) 'Accept-Language': locale,
+      },
       body: jsonEncode({
         'payment_method': paymentMethod,
-        if (forceFail) 'force_fail': true,
+        if (kDebugMode && forceFail) 'force_fail': true,
+        if (walletPin != null && walletPin.isNotEmpty) 'wallet_pin': walletPin,
+        if (buyerPhone != null && buyerPhone.isNotEmpty) 'buyer_phone': buyerPhone,
       }),
     );
     final body = _decode(response);
@@ -130,7 +139,7 @@ class PrivateEventService {
     required int eventId,
     required int quantity,
   }) async {
-    final response = await http.post(
+    final response = await ApiClient.post(
       Uri.parse('${ApiConfig.baseUrl}/private-events/$eventId/add-tickets'),
       headers: _headers,
       body: jsonEncode({'quantity': quantity}),
@@ -147,7 +156,7 @@ class PrivateEventService {
 
   Future<({List<InvitationModel> invitations, int remaining, PrivateEventModel? event})>
       invitations(int eventId) async {
-    final response = await http.get(
+    final response = await ApiClient.get(
       Uri.parse('${ApiConfig.baseUrl}/private-events/$eventId/invitations'),
       headers: _headers,
     );
@@ -169,11 +178,15 @@ class PrivateEventService {
   Future<int> sendInvitations({
     required int eventId,
     required List<Map<String, dynamic>> guests,
+    required String channel,
   }) async {
-    final response = await http.post(
+    final response = await ApiClient.post(
       Uri.parse('${ApiConfig.baseUrl}/private-events/$eventId/invitations'),
       headers: _headers,
-      body: jsonEncode({'guests': guests}),
+      body: jsonEncode({
+        'guests': guests,
+        'channel': channel,
+      }),
     );
     final body = _decode(response);
     if (response.statusCode >= 400) {
@@ -185,13 +198,14 @@ class PrivateEventService {
   Future<void> resendInvitation({
     required int eventId,
     required int invitationId,
+    required String channel,
   }) async {
-    final response = await http.post(
+    final response = await ApiClient.post(
       Uri.parse(
         '${ApiConfig.baseUrl}/private-events/$eventId/invitations/$invitationId/resend',
       ),
       headers: _headers,
-      body: jsonEncode({}),
+      body: jsonEncode({'channel': channel}),
     );
     final body = _decode(response);
     if (response.statusCode >= 400) {
@@ -199,29 +213,11 @@ class PrivateEventService {
     }
   }
 
-  Future<void> updatePhone({
-    required int eventId,
-    required int invitationId,
-    required String phone,
-  }) async {
-    final response = await http.post(
-      Uri.parse(
-        '${ApiConfig.baseUrl}/private-events/$eventId/invitations/$invitationId/phone',
-      ),
-      headers: _headers,
-      body: jsonEncode({'phone': phone}),
-    );
-    final body = _decode(response);
-    if (response.statusCode >= 400) {
-      throw Exception(_error(body) ?? 'Could not update phone.');
-    }
-  }
-
   Future<void> revokeInvitation({
     required int eventId,
     required int invitationId,
   }) async {
-    final response = await http.post(
+    final response = await ApiClient.post(
       Uri.parse(
         '${ApiConfig.baseUrl}/private-events/$eventId/invitations/$invitationId/revoke',
       ),
@@ -234,10 +230,8 @@ class PrivateEventService {
     }
   }
 
-  Map<String, dynamic> _decode(http.Response response) {
-    if (response.body.isEmpty) return {};
-    final decoded = jsonDecode(response.body);
-    return decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
+  Map<String, dynamic> _decode(dynamic response) {
+    return ApiClient.decode(response);
   }
 
   String? _error(Map<String, dynamic> body) {

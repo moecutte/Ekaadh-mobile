@@ -44,9 +44,12 @@ class EventModel {
   final String? eventTimeLabel;
   final String? coverImage;
   final bool isFeatured;
+  final bool isFree;
   final double? startingPrice;
   final String? organizerName;
   final List<TicketTypeModel> ticketTypes;
+  final bool paymentSandbox;
+  final double serviceFee;
 
   const EventModel({
     required this.id,
@@ -63,9 +66,12 @@ class EventModel {
     required this.eventTimeLabel,
     required this.coverImage,
     required this.isFeatured,
+    required this.isFree,
     required this.startingPrice,
     required this.organizerName,
     required this.ticketTypes,
+    this.paymentSandbox = false,
+    this.serviceFee = 1,
   });
 
   factory EventModel.fromJson(Map<String, dynamic> json) {
@@ -89,11 +95,27 @@ class EventModel {
       eventTimeLabel: json['event_time_label'] as String?,
       coverImage: MediaUrl.resolve(json['cover_image'] as String?),
       isFeatured: json['is_featured'] as bool? ?? false,
+      isFree: json['is_free'] as bool? ??
+          ((json['starting_price'] as num?)?.toDouble() ?? 0) == 0,
       startingPrice: json['starting_price'] == null
           ? null
           : (json['starting_price'] as num).toDouble(),
       organizerName: organizer?['business_name'] as String?,
       ticketTypes: types,
+      paymentSandbox: json['payment_sandbox'] as bool? ?? false,
+      serviceFee: (json['service_fee'] as num?)?.toDouble() ?? 1,
     );
+  }
+
+  /// True when the event date is before today (local). No date = still on sale.
+  bool get isExpired {
+    final raw = eventDate?.trim();
+    if (raw == null || raw.isEmpty) return false;
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return false;
+    final day = DateTime(parsed.year, parsed.month, parsed.day);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return day.isBefore(today);
   }
 }

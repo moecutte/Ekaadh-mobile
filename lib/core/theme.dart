@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 /// Matches customer-webview / admin brand tokens.
+///
+/// App UI uses the platform typeface (SF Pro on iOS, Roboto on Android).
 class EkaadhColors {
   static const Color brand = Color(0xFF323891);
   static const Color brandDark = Color(0xFF262A6D);
@@ -10,6 +12,7 @@ class EkaadhColors {
   static const Color soft = Color(0xFF94A3B8);
   static const Color surface = Color(0xFFF2F4F8);
   static const Color danger = Color(0xFFEF4444);
+  static const Color success = Color(0xFF22C55E);
   /// Quiet placeholder text for inputs.
   static const Color hint = Color(0xFFC5CBD6);
   /// Soft field border (matches Search / Home inputs).
@@ -32,6 +35,7 @@ class EkaadhFields {
     Widget? prefixIcon,
     Widget? suffixIcon,
     double radius = 16,
+    Color fillColor = EkaadhColors.surface,
     EdgeInsetsGeometry contentPadding =
         const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
   }) {
@@ -42,7 +46,7 @@ class EkaadhFields {
       prefixIcon: prefixIcon,
       suffixIcon: suffixIcon,
       filled: true,
-      fillColor: EkaadhColors.surface,
+      fillColor: fillColor,
       contentPadding: contentPadding,
       border: OutlineInputBorder(
         borderRadius: borderRadius,
@@ -56,6 +60,21 @@ class EkaadhFields {
         borderRadius: borderRadius,
         borderSide: const BorderSide(color: EkaadhColors.brand, width: 1.5),
       ),
+    );
+  }
+
+  /// White outlined fields used by create/checkout wizards.
+  static InputDecoration form({
+    String? hintText,
+    Widget? prefixIcon,
+    Widget? suffixIcon,
+  }) {
+    return decoration(
+      hintText: hintText,
+      prefixIcon: prefixIcon,
+      suffixIcon: suffixIcon,
+      fillColor: Colors.white,
+      radius: 12,
     );
   }
 }

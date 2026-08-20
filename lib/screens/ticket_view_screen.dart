@@ -11,6 +11,9 @@ import 'package:ekaadh_mobile/models/ticket_model.dart';
 import 'package:ekaadh_mobile/services/ticket_pdf_service.dart';
 import 'package:ekaadh_mobile/widgets/design_network_image.dart';
 import 'package:ekaadh_mobile/widgets/invitation_overlay_preview.dart';
+import 'package:ekaadh_mobile/widgets/invitation_theme_preview.dart';
+import 'package:ekaadh_mobile/core/user_facing_error.dart';
+import 'package:ekaadh_mobile/widgets/ekaadh_toast.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 class TicketViewScreen extends StatefulWidget {
@@ -36,19 +39,12 @@ class _TicketViewScreenState extends State<TicketViewScreen> {
     try {
       await TicketPdfService().download(ticket);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(LocaleScope.of(context).t('ticket_pdf_ready'))),
-      );
+      await EkaadhToast.success(context, message: LocaleScope.of(context).t('ticket_pdf_ready'));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.toString().replaceFirst('Exception: ', ''),
-            style: const TextStyle(color: Colors.white),
-          ),
-          backgroundColor: EkaadhColors.danger,
-        ),
+      await EkaadhToast.error(
+        context,
+        message: UserFacingError.message(e, t: LocaleScope.of(context).t),
       );
     } finally {
       if (mounted) setState(() => _downloading = false);
@@ -56,7 +52,7 @@ class _TicketViewScreenState extends State<TicketViewScreen> {
   }
 
   Future<void> _shareInvitationImage() async {
-    if (_sharing || !ticket.isOverlayInvite) return;
+    if (_sharing || !ticket.isDesignedInvite) return;
     final l10n = LocaleScope.of(context);
     setState(() {
       _sharing = true;
@@ -93,14 +89,9 @@ class _TicketViewScreenState extends State<TicketViewScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.toString().replaceFirst('Exception: ', ''),
-            style: const TextStyle(color: Colors.white),
-          ),
-          backgroundColor: EkaadhColors.danger,
-        ),
+      await EkaadhToast.error(
+        context,
+        message: UserFacingError.message(e, t: LocaleScope.of(context).t),
       );
     } finally {
       if (mounted) {
@@ -135,7 +126,7 @@ class _TicketViewScreenState extends State<TicketViewScreen> {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         title: Text(
-          ticket.isOverlayInvite ? l10n.t('invitation') : l10n.t('ticket'),
+          ticket.isDesignedInvite ? l10n.t('invitation') : l10n.t('ticket'),
           style: const TextStyle(fontWeight: FontWeight.w900),
         ),
         leading: IconButton(
@@ -143,7 +134,7 @@ class _TicketViewScreenState extends State<TicketViewScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          if (ticket.isOverlayInvite)
+          if (ticket.isDesignedInvite)
             IconButton(
               onPressed: _sharing ? null : _shareInvitationImage,
               tooltip: l10n.t('share_invitation_image'),
@@ -160,18 +151,27 @@ class _TicketViewScreenState extends State<TicketViewScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 36),
         children: [
-          if (ticket.isOverlayInvite)
+          if (ticket.isDesignedInvite)
             Center(
               child: RepaintBoundary(
                 key: _shareKey,
-                child: InvitationOverlayPreview(
-                  design: ticket.invitationDesign!.toDesignOption(),
-                  fieldValues: _overlayValues,
-                  maxWidth: 420,
-                  qrPayload: ticket.qrPayload,
-                  showQrChrome: false,
-                  includeQr: !_captureForShare,
-                ),
+                child: ticket.isOverlayInvite
+                    ? InvitationOverlayPreview(
+                        design: ticket.invitationDesign!.toDesignOption(),
+                        fieldValues: _overlayValues,
+                        maxWidth: 420,
+                        qrPayload: ticket.qrPayload,
+                        showQrChrome: false,
+                        includeQr: !_captureForShare,
+                      )
+                    : InvitationThemePreview(
+                        design: ticket.invitationDesign!.toDesignOption(),
+                        fieldValues: _overlayValues,
+                        maxWidth: 420,
+                        qrPayload: ticket.qrPayload,
+                        includeQr: !_captureForShare,
+                        guestName: ticket.holderName,
+                      ),
               ),
             )
           else
@@ -288,7 +288,7 @@ class _TicketViewScreenState extends State<TicketViewScreen> {
               ],
             ),
           ),
-          if (ticket.isOverlayInvite) ...[
+          if (ticket.isDesignedInvite) ...[
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,

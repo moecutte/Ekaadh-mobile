@@ -7,7 +7,7 @@ class PhoneNumberField extends StatelessWidget {
   const PhoneNumberField({
     super.key,
     required this.controller,
-    this.hint = '61 234 5678',
+    this.hint = '63 234 5678',
     this.borderRadius = 16,
     this.contentPadding = const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
     this.readOnly = false,

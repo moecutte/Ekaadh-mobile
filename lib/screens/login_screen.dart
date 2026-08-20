@@ -6,6 +6,7 @@ import 'package:ekaadh_mobile/screens/register_screen.dart';
 import 'package:ekaadh_mobile/screens/staff_login_screen.dart';
 import 'package:ekaadh_mobile/widgets/ekaadh_logo.dart';
 import 'package:ekaadh_mobile/widgets/phone_number_field.dart';
+import 'package:ekaadh_mobile/core/user_facing_error.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
@@ -47,16 +48,24 @@ class _LoginScreenState extends State<LoginScreen> {
       _loading = true;
       _error = null;
     });
-    final error = await widget.auth.login(
-      login: PhoneNumberField.fullNumber(_loginController.text),
-      password: _passwordController.text,
-    );
-    if (!mounted) return;
-    setState(() => _loading = false);
-    if (error == null) {
-      widget.onSignedIn();
-    } else {
-      setState(() => _error = error);
+    try {
+      final error = await widget.auth.login(
+        login: PhoneNumberField.fullNumber(_loginController.text),
+        password: _passwordController.text,
+      );
+      if (!mounted) return;
+      setState(() => _loading = false);
+      if (error == null) {
+        widget.onSignedIn();
+      } else {
+        setState(() => _error = UserFacingError.message(error, t: l10n.t));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = UserFacingError.message(e, t: l10n.t);
+      });
     }
   }
 

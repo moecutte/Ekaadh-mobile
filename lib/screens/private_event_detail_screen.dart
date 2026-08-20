@@ -8,6 +8,7 @@ import 'package:ekaadh_mobile/screens/private_event_add_capacity_screen.dart';
 import 'package:ekaadh_mobile/screens/private_event_invitations_screen.dart';
 import 'package:ekaadh_mobile/screens/private_event_pay_screen.dart';
 import 'package:ekaadh_mobile/widgets/design_network_image.dart';
+import 'package:ekaadh_mobile/core/user_facing_error.dart';
 
 class PrivateEventDetailScreen extends StatefulWidget {
   const PrivateEventDetailScreen({
@@ -63,7 +64,7 @@ class _PrivateEventDetailScreenState extends State<PrivateEventDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = UserFacingError.message(e, t: LocaleScope.of(context).t);
         _loading = false;
       });
     }

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
 import 'package:ekaadh_mobile/core/locale_scope.dart';
+import 'package:ekaadh_mobile/core/user_facing_error.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
+import 'package:ekaadh_mobile/services/push_notification_service.dart';
 import 'package:ekaadh_mobile/screens/support_screen.dart';
+import 'package:ekaadh_mobile/widgets/ekaadh_toast.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({
@@ -65,6 +68,14 @@ class _ProfileTabState extends State<ProfileTab> {
                   somLabel: l10n.t('som'),
                   onSelect: l10n.setLocale,
                 ),
+                if (signedIn)
+                  _SettingsSwitch(
+                    icon: Icons.notifications_outlined,
+                    title: l10n.t('push_notifications'),
+                    subtitle: l10n.t('push_notifications_sub'),
+                    value: user.pushNotificationsEnabled,
+                    onChanged: _setPushEnabled,
+                  ),
                 _SettingsTile(
                   icon: Icons.chat_bubble_outline,
                   title: l10n.t('support'),
@@ -151,6 +162,22 @@ class _ProfileTabState extends State<ProfileTab> {
                   child: Text(l10n.t('sign_out')),
                 ),
               ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: _deleteAccountSheet,
+                  style: TextButton.styleFrom(
+                    foregroundColor: EkaadhColors.danger,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    textStyle: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
+                  ),
+                  child: Text(l10n.t('delete_account')),
+                ),
+              ),
             ] else ...[
               const SizedBox(height: 32),
               Text(
@@ -209,6 +236,147 @@ class _ProfileTabState extends State<ProfileTab> {
         builder: (_) => SupportScreen(auth: widget.auth),
       ),
     );
+  }
+
+  Future<void> _setPushEnabled(bool enabled) async {
+    final user = widget.auth.user;
+    if (user == null) return;
+    final err = await widget.auth.updateProfile(
+      name: user.name,
+      pushNotificationsEnabled: enabled,
+    );
+    if (!mounted) return;
+    if (err != null) {
+      await EkaadhToast.error(
+        context,
+        message: UserFacingError.message(err, t: LocaleScope.of(context).t),
+      );
+      return;
+    }
+    await PushNotificationService.setEnabled(widget.auth, enabled);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _deleteAccountSheet() async {
+    final password = TextEditingController();
+    final deleted = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        String? error;
+        var saving = false;
+        return StatefulBuilder(
+          builder: (ctx, setModal) {
+            final l10n = LocaleScope.of(ctx);
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                16,
+                20,
+                20 + MediaQuery.of(ctx).viewInsets.bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE5E7EB),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    l10n.t('delete_account'),
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    l10n.t('delete_account_hint'),
+                    style: const TextStyle(color: EkaadhColors.muted, fontSize: 13, height: 1.4),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: password,
+                    obscureText: true,
+                    decoration: EkaadhFields.decoration(hintText: l10n.t('password')),
+                  ),
+                  if (error != null) ...[
+                    const SizedBox(height: 10),
+                    Text(error!, style: const TextStyle(color: EkaadhColors.danger)),
+                  ],
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: saving
+                          ? null
+                          : () async {
+                              if (password.text.isEmpty) {
+                                setModal(() => error = l10n.t('enter_password_to_delete'));
+                                return;
+                              }
+                              setModal(() {
+                                saving = true;
+                                error = null;
+                              });
+                              try {
+                                final err = await widget.auth.deleteAccount(password: password.text);
+                                if (!ctx.mounted) return;
+                                if (err != null) {
+                                  setModal(() {
+                                    saving = false;
+                                    error = UserFacingError.message(err, t: l10n.t);
+                                  });
+                                  return;
+                                }
+                                Navigator.of(ctx).pop(true);
+                              } catch (e) {
+                                if (!ctx.mounted) return;
+                                setModal(() {
+                                  saving = false;
+                                  error = UserFacingError.message(e, t: l10n.t);
+                                });
+                              }
+                            },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: EkaadhColors.danger,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: saving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : Text(
+                              l10n.t('delete_account_confirm'),
+                              style: const TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+    password.dispose();
+    if (deleted == true) {
+      await widget.onSignOut();
+    }
   }
 
   Future<void> _editName(String current) async {
@@ -283,16 +451,24 @@ class _ProfileTabState extends State<ProfileTab> {
                                 saving = true;
                                 error = null;
                               });
-                              final err = await widget.auth.updateProfile(name: name);
-                              if (!ctx.mounted) return;
-                              if (err != null) {
+                              try {
+                                final err = await widget.auth.updateProfile(name: name);
+                                if (!ctx.mounted) return;
+                                if (err != null) {
+                                  setModal(() {
+                                    saving = false;
+                                    error = UserFacingError.message(err, t: LocaleScope.of(ctx).t);
+                                  });
+                                  return;
+                                }
+                                Navigator.of(ctx).pop(true);
+                              } catch (e) {
+                                if (!ctx.mounted) return;
                                 setModal(() {
                                   saving = false;
-                                  error = err;
+                                  error = UserFacingError.message(e, t: LocaleScope.of(ctx).t);
                                 });
-                                return;
                               }
-                              Navigator.of(ctx).pop(true);
                             },
                       style: FilledButton.styleFrom(
                         backgroundColor: EkaadhColors.brand,
@@ -397,19 +573,27 @@ class _ProfileTabState extends State<ProfileTab> {
                                 saving = true;
                                 error = null;
                               });
-                              final err = await widget.auth.updateProfile(
-                                name: name,
-                                email: email.isEmpty ? null : email,
-                              );
-                              if (!ctx.mounted) return;
-                              if (err != null) {
+                              try {
+                                final err = await widget.auth.updateProfile(
+                                  name: name,
+                                  email: email.isEmpty ? null : email,
+                                );
+                                if (!ctx.mounted) return;
+                                if (err != null) {
+                                  setModal(() {
+                                    saving = false;
+                                    error = UserFacingError.message(err, t: LocaleScope.of(ctx).t);
+                                  });
+                                  return;
+                                }
+                                Navigator.of(ctx).pop(true);
+                              } catch (e) {
+                                if (!ctx.mounted) return;
                                 setModal(() {
                                   saving = false;
-                                  error = err;
+                                  error = UserFacingError.message(e, t: LocaleScope.of(ctx).t);
                                 });
-                                return;
                               }
-                              Navigator.of(ctx).pop(true);
                             },
                       style: FilledButton.styleFrom(
                         backgroundColor: EkaadhColors.brand,
@@ -546,26 +730,34 @@ class _ProfileTabState extends State<ProfileTab> {
                                 error = null;
                                 success = null;
                               });
-                              final err = await widget.auth.changePassword(
-                                currentPassword: current.text,
-                                password: next.text,
-                                passwordConfirmation: confirm.text,
-                              );
-                              if (!ctx.mounted) return;
-                              if (err != null) {
+                              try {
+                                final err = await widget.auth.changePassword(
+                                  currentPassword: current.text,
+                                  password: next.text,
+                                  passwordConfirmation: confirm.text,
+                                );
+                                if (!ctx.mounted) return;
+                                if (err != null) {
+                                  setModal(() {
+                                    saving = false;
+                                    error = UserFacingError.message(err, t: sheetL10n.t);
+                                  });
+                                  return;
+                                }
+                                current.clear();
+                                next.clear();
+                                confirm.clear();
                                 setModal(() {
                                   saving = false;
-                                  error = err;
+                                  success = sheetL10n.t('password_updated');
                                 });
-                                return;
+                              } catch (e) {
+                                if (!ctx.mounted) return;
+                                setModal(() {
+                                  saving = false;
+                                  error = UserFacingError.message(e, t: sheetL10n.t);
+                                });
                               }
-                              current.clear();
-                              next.clear();
-                              confirm.clear();
-                              setModal(() {
-                                saving = false;
-                                success = sheetL10n.t('password_updated');
-                              });
                             },
                       style: FilledButton.styleFrom(
                         backgroundColor: EkaadhColors.brand,
@@ -807,6 +999,64 @@ class _SettingsGroup extends StatelessWidget {
             if (i > 0) const Divider(height: 1, color: Color(0xFFF0F0F4)),
             children[i],
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsSwitch extends StatelessWidget {
+  const _SettingsSwitch({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: EkaadhColors.brandLight,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: EkaadhColors.brand, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: const TextStyle(color: EkaadhColors.muted, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          Switch.adaptive(
+            value: value,
+            activeThumbColor: EkaadhColors.brand,
+            onChanged: onChanged,
+          ),
         ],
       ),
     );

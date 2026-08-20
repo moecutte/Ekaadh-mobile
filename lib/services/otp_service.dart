@@ -1,6 +1,7 @@
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
+import 'package:ekaadh_mobile/core/api_client.dart';
 import 'package:ekaadh_mobile/core/api_config.dart';
 import 'package:ekaadh_mobile/models/ticket_model.dart';
 
@@ -37,7 +38,7 @@ class OtpService {
     return OtpResult(
       phone: body['phone']?.toString() ?? phone,
       message: body['message']?.toString() ?? 'Code sent.',
-      debugCode: body['debug_code']?.toString(),
+      debugCode: kDebugMode ? body['debug_code']?.toString() : null,
     );
   }
 
@@ -66,34 +67,19 @@ class OtpService {
   }
 
   Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> payload) async {
-    late http.Response response;
-    try {
-      response = await http.post(
+    final response = await ApiClient.post(
         Uri.parse('${ApiConfig.baseUrl}$path'),
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
+        headers: ApiClient.jsonHeaders(),
         body: jsonEncode(payload),
       );
-    } catch (e) {
-      throw Exception(
-        'Cannot reach server at ${ApiConfig.baseUrl}. Is the Laravel API running?',
-      );
-    }
 
-    Map<String, dynamic> body = {};
-    if (response.body.isNotEmpty) {
-      try {
-        body = jsonDecode(response.body) as Map<String, dynamic>;
-      } catch (_) {
-        throw Exception('Unexpected server response (${response.statusCode}).');
-      }
-    }
+    final body = ApiClient.decode(response);
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception(
-        _firstError(body) ?? body['message']?.toString() ?? 'Request failed (${response.statusCode})',
+        _firstError(body) ??
+            body['message']?.toString() ??
+            'Something went wrong. Please try again.',
       );
     }
 

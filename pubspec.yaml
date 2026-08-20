@@ -22,6 +22,7 @@ dependencies:
   firebase_core: ^4.13.0
   firebase_messaging: ^16.5.0
   share_plus: ^10.1.4
+  flutter_secure_storage: ^9.2.4
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -33,3 +34,7 @@ flutter:
     - assets/images/ekaadh_logo.png
     - assets/images/ekaadh_logo_white.png
     - assets/images/ekaadh_icon.png
+    - assets/images/telesom-logo.png
+    - assets/images/golis-logo.png
+    - assets/images/hormuud-logo.png
+    - assets/images/somtel-logo.png

@@ -1,6 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
 import 'package:ekaadh_mobile/core/locale_service.dart';
@@ -65,7 +65,7 @@ class _EkaadhAppState extends State<EkaadhApp> {
     if (_auth.token != null) {
       final ok = await _auth.fetchMe();
       _signedIn = ok;
-      if (ok) {
+      if (ok && (_auth.user?.pushNotificationsEnabled ?? true)) {
         await PushNotificationService.syncToken(_auth);
       }
     }
@@ -92,7 +92,9 @@ class _EkaadhAppState extends State<EkaadhApp> {
 
   void _onSignedIn() {
     setState(() => _signedIn = true);
-    PushNotificationService.syncToken(_auth);
+    if (_auth.user?.pushNotificationsEnabled ?? true) {
+      PushNotificationService.syncToken(_auth);
+    }
   }
 
   Future<void> _onSignOut() async {
@@ -132,13 +134,18 @@ class _EkaadhAppState extends State<EkaadhApp> {
             locale: Locale(_locale.code),
             theme: ThemeData(
               useMaterial3: true,
+              // SF Pro on iOS; Roboto on Android and Chrome.
+              typography: Typography.material2021(
+                platform: kIsWeb
+                    ? TargetPlatform.android
+                    : defaultTargetPlatform,
+              ),
               colorScheme: ColorScheme.fromSeed(
                 seedColor: EkaadhColors.brand,
                 primary: EkaadhColors.brand,
                 surface: EkaadhColors.surface,
               ),
               scaffoldBackgroundColor: Colors.white,
-              textTheme: GoogleFonts.plusJakartaSansTextTheme(),
               appBarTheme: const AppBarTheme(
                 backgroundColor: Colors.white,
                 foregroundColor: EkaadhColors.dark,
@@ -164,6 +171,19 @@ class _EkaadhAppState extends State<EkaadhApp> {
                   borderSide:
                       const BorderSide(color: EkaadhColors.brand, width: 1.5),
                 ),
+              ),
+              snackBarTheme: SnackBarThemeData(
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: Colors.white,
+                contentTextStyle: const TextStyle(
+                  color: EkaadhColors.dark,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                elevation: 8,
               ),
             ),
             home: home,

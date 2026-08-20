@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:ekaadh_mobile/core/locale_scope.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
 import 'package:ekaadh_mobile/models/ticket_model.dart';
+import 'package:ekaadh_mobile/screens/otp_verification_screen.dart';
 import 'package:ekaadh_mobile/screens/ticket_view_screen.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/services/otp_service.dart';
 import 'package:ekaadh_mobile/services/ticket_service.dart';
 import 'package:ekaadh_mobile/widgets/design_network_image.dart';
 import 'package:ekaadh_mobile/widgets/phone_number_field.dart';
+import 'package:ekaadh_mobile/core/user_facing_error.dart';
 
 class MyTicketsTab extends StatefulWidget {
   const MyTicketsTab({
@@ -26,54 +28,89 @@ class MyTicketsTab extends StatefulWidget {
 }
 
 class _MyTicketsTabState extends State<MyTicketsTab> {
-  String _tab = 'upcoming';
-  late Future<List<TicketModel>> _future;
+  /// all | valid | expired
+  String _statusFilter = 'all';
+  List<TicketModel> _tickets = [];
+  bool _loading = false;
+  String? _error;
   final _phoneController = TextEditingController();
-  final _otpController = TextEditingController();
   bool _lookingUp = false;
-  bool _otpSent = false;
   String? _lookupError;
-  String? _otpHint;
   List<TicketModel>? _guestTickets;
 
   bool get _signedIn => widget.auth.token != null;
 
+  List<TicketModel> get _filteredTickets {
+    return _tickets.where((t) {
+      if (_statusFilter == 'valid' && !t.isUpcoming) return false;
+      if (_statusFilter == 'expired' && t.isUpcoming) return false;
+      return true;
+    }).toList();
+  }
+
   @override
   void initState() {
     super.initState();
-    _future = _load();
+    if (_signedIn) _load();
   }
 
   @override
   void didUpdateWidget(covariant MyTicketsTab oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.auth.token != widget.auth.token) {
-      _reload();
+      if (_signedIn) {
+        _load();
+      } else {
+        setState(() {
+          _tickets = [];
+          _error = null;
+          _loading = false;
+        });
+      }
     } else if (!oldWidget.active && widget.active && _signedIn) {
-      _reload();
+      _load();
     }
   }
 
   @override
   void dispose() {
     _phoneController.dispose();
-    _otpController.dispose();
     super.dispose();
   }
 
-  Future<List<TicketModel>> _load() {
+  Future<void> _load() async {
     final token = widget.auth.token;
-    if (token == null) return Future.value([]);
-    return TicketService().mine(token: token, tab: _tab);
-  }
-
-  void _reload() {
+    if (token == null) return;
+    final showSpinner = _tickets.isEmpty;
     setState(() {
-      _future = _load();
+      if (showSpinner) _loading = true;
+      _error = null;
     });
+    try {
+      final service = TicketService();
+      final results = await Future.wait([
+        service.mine(token: token, tab: 'upcoming'),
+        service.mine(token: token, tab: 'past'),
+      ]);
+      final seen = <int>{};
+      final tickets = [...results[0], ...results[1]]
+          .where((t) => !t.isPrivate && seen.add(t.id))
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _tickets = tickets;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = UserFacingError.message(e, t: LocaleScope.of(context).t);
+        _loading = false;
+      });
+    }
   }
 
-  Future<void> _sendFindOtp() async {
+  Future<void> _lookupTickets() async {
     final l10n = LocaleScope.of(context);
     if (!PhoneNumberField.hasLocalNumber(_phoneController.text)) {
       setState(() => _lookupError = l10n.t('enter_phone'));
@@ -84,57 +121,32 @@ class _MyTicketsTabState extends State<MyTicketsTab> {
       _lookupError = null;
     });
     try {
-      final result = await OtpService().send(
+      final sent = await OtpService().send(
         phone: PhoneNumberField.fullNumber(_phoneController.text),
         purpose: OtpService.purposeFindTickets,
       );
       if (!mounted) return;
-      setState(() {
-        _lookingUp = false;
-        _otpSent = true;
-        _otpHint = result.debugCode != null
-            ? '${l10n.t('testing_code')}: ${result.debugCode}'
-            : result.message;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _lookingUp = false;
-        _lookupError = e.toString().replaceFirst('Exception: ', '');
-      });
-    }
-  }
+      setState(() => _lookingUp = false);
 
-  Future<void> _lookupTickets() async {
-    final l10n = LocaleScope.of(context);
-    if (!_otpSent) {
-      await _sendFindOtp();
-      return;
-    }
-    if (_otpController.text.trim().isEmpty) {
-      setState(() => _lookupError = l10n.t('enter_confirmation_code'));
-      return;
-    }
-    setState(() {
-      _lookingUp = true;
-      _lookupError = null;
-    });
-    try {
-      final result = await OtpService().verify(
-        phone: PhoneNumberField.fullNumber(_phoneController.text),
-        purpose: OtpService.purposeFindTickets,
-        otp: _otpController.text.trim(),
+      final verified = await Navigator.of(context).push<OtpResult>(
+        MaterialPageRoute(
+          builder: (_) => OtpVerificationScreen(
+            phone: PhoneNumberField.fullNumber(_phoneController.text),
+            purpose: OtpService.purposeFindTickets,
+            alreadySent: true,
+            debugHint: sent.debugCode != null
+                ? '${l10n.t('testing_code')}: ${sent.debugCode}'
+                : null,
+          ),
+        ),
       );
-      if (!mounted) return;
-      setState(() {
-        _lookingUp = false;
-        _guestTickets = result.tickets;
-      });
+      if (!mounted || verified == null) return;
+      setState(() => _guestTickets = verified.tickets);
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _lookingUp = false;
-        _lookupError = e.toString().replaceFirst('Exception: ', '');
+        _lookupError = UserFacingError.message(e, t: LocaleScope.of(context).t);
       });
     }
   }
@@ -142,9 +154,6 @@ class _MyTicketsTabState extends State<MyTicketsTab> {
   void _resetGuestLookup() {
     setState(() {
       _guestTickets = null;
-      _otpSent = false;
-      _otpController.clear();
-      _otpHint = null;
       _lookupError = null;
     });
   }
@@ -154,110 +163,200 @@ class _MyTicketsTabState extends State<MyTicketsTab> {
     if (!_signedIn) {
       if (_guestTickets != null) {
         return _GuestTicketsResult(
-          tickets: _guestTickets!,
+          tickets: _guestTickets!.where((t) => !t.isPrivate).toList(),
           onBack: _resetGuestLookup,
         );
       }
       return _GuestTicketsGate(
         phoneController: _phoneController,
-        otpController: _otpController,
         lookingUp: _lookingUp,
-        otpSent: _otpSent,
-        otpHint: _otpHint,
         lookupError: _lookupError,
         onSignIn: widget.onRequestSignIn,
         onLookup: _lookupTickets,
-        onResend: _sendFindOtp,
       );
     }
 
     final l10n = LocaleScope.of(context);
+    final filtered = _filteredTickets;
     return ColoredBox(
       color: Colors.white,
       child: SafeArea(
-      bottom: false,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-            child: Text(l10n.t('booked_events'), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
-            child: Text(
-              l10n.t('booked_events_desc'),
-              style: const TextStyle(color: EkaadhColors.muted, fontSize: 13),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(color: EkaadhColors.surface, borderRadius: BorderRadius.circular(18)),
-              child: Row(
-                children: [
-                  _TabBtn(label: l10n.t('upcoming'), active: _tab == 'upcoming', onTap: () {
-                    setState(() => _tab = 'upcoming');
-                    _reload();
-                  }),
-                  _TabBtn(label: l10n.t('past'), active: _tab == 'past', onTap: () {
-                    setState(() => _tab = 'past');
-                    _reload();
-                  }),
-                ],
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+              child: Text(
+                l10n.t('booked_events'),
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.4,
+                ),
               ),
             ),
-          ),
-          Expanded(
-            child: RefreshIndicator(
-              color: EkaadhColors.brand,
-              onRefresh: () async => _reload(),
-              child: FutureBuilder<List<TicketModel>>(
-                future: _future,
-                builder: (context, snap) {
-                  if (snap.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator(color: EkaadhColors.brand));
-                  }
-                  if (snap.hasError) {
-                    return ListView(children: [
-                      const SizedBox(height: 80),
-                      Text('${snap.error}', textAlign: TextAlign.center),
-                      TextButton(onPressed: _reload, child: Text(l10n.t('retry'))),
-                    ]);
-                  }
-                  final tickets = snap.data ?? [];
-                  if (tickets.isEmpty) {
-                    return ListView(children: [
-                      const SizedBox(height: 100),
-                      const Icon(Icons.event_available_outlined, size: 48, color: EkaadhColors.soft),
-                      const SizedBox(height: 12),
-                      Text(
-                        _tab == 'upcoming' ? l10n.t('no_upcoming_booked') : l10n.t('no_past_booked'),
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        l10n.t('buy_or_invitation'),
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: EkaadhColors.muted),
-                      ),
-                    ]);
-                  }
-                  return ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
-                    itemCount: tickets.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 14),
-                    itemBuilder: (_, i) => _TicketCard(ticket: tickets[i]),
-                  );
-                },
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+              child: Text(
+                l10n.t('booked_events_desc'),
+                style: const TextStyle(color: EkaadhColors.muted, fontSize: 13),
               ),
             ),
-          ),
-        ],
+            if (_tickets.isNotEmpty)
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                child: Row(
+                  children: [
+                    _filterChip(
+                      label: l10n.t('all_status'),
+                      active: _statusFilter == 'all',
+                      onTap: () => setState(() => _statusFilter = 'all'),
+                    ),
+                    _filterChip(
+                      label: l10n.t('valid'),
+                      active: _statusFilter == 'valid',
+                      onTap: () => setState(() => _statusFilter = 'valid'),
+                    ),
+                    _filterChip(
+                      label: l10n.t('expired'),
+                      active: _statusFilter == 'expired',
+                      onTap: () => setState(() => _statusFilter = 'expired'),
+                    ),
+                  ],
+                ),
+              ),
+            Expanded(
+              child: RefreshIndicator(
+                color: EkaadhColors.brand,
+                onRefresh: _load,
+                child: _loading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: EkaadhColors.brand,
+                        ),
+                      )
+                    : _error != null
+                        ? ListView(
+                            padding: const EdgeInsets.all(24),
+                            children: [
+                              Text(
+                                _error!,
+                                style: const TextStyle(color: EkaadhColors.danger),
+                              ),
+                              const SizedBox(height: 12),
+                              FilledButton(
+                                onPressed: _load,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: EkaadhColors.brand,
+                                ),
+                                child: Text(l10n.t('retry')),
+                              ),
+                            ],
+                          )
+                        : _tickets.isEmpty
+                            ? ListView(
+                                padding: const EdgeInsets.all(24),
+                                children: [
+                                  const SizedBox(height: 72),
+                                  const Icon(
+                                    Icons.event_available_outlined,
+                                    size: 44,
+                                    color: EkaadhColors.soft,
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Text(
+                                    l10n.t('no_booked_yet'),
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 17,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    l10n.t('buy_or_invitation'),
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: EkaadhColors.muted,
+                                      height: 1.45,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : filtered.isEmpty
+                                ? ListView(
+                                    padding: const EdgeInsets.all(24),
+                                    children: [
+                                      const SizedBox(height: 48),
+                                      const Icon(
+                                        Icons.filter_list_off_rounded,
+                                        size: 40,
+                                        color: EkaadhColors.soft,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        l10n.t('no_tickets_filters'),
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        l10n.t('try_valid_expired'),
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          color: EkaadhColors.muted,
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : ListView.separated(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        16, 4, 16, 110),
+                                    itemCount: filtered.length,
+                                    separatorBuilder: (_, __) =>
+                                        const SizedBox(height: 10),
+                                    itemBuilder: (_, i) =>
+                                        _TicketCard(ticket: filtered[i]),
+                                  ),
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
+    );
+  }
+
+  Widget _filterChip({
+    required String label,
+    required bool active,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Material(
+        color: active ? EkaadhColors.brand : const Color(0xFFF3F4F8),
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: active ? Colors.white : EkaadhColors.dark,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -270,119 +369,158 @@ class _TicketCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = LocaleScope.of(context);
+    final expired = !ticket.isUpcoming;
+    final statusLabel = expired
+        ? l10n.t('expired')
+        : ticket.status == 'valid'
+            ? l10n.t('valid')
+            : ticket.status[0].toUpperCase() + ticket.status.substring(1);
+    final meta = [
+      if (ticket.eventDateLabel != null && ticket.eventDateLabel!.isNotEmpty)
+        ticket.eventDateLabel!,
+      if (ticket.eventTimeLabel != null && ticket.eventTimeLabel!.isNotEmpty)
+        ticket.eventTimeLabel!,
+      if (ticket.venue != null && ticket.venue!.isNotEmpty) ticket.venue!,
+    ].join(' · ');
+
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      clipBehavior: Clip.antiAlias,
-      elevation: 0,
+      borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => TicketViewScreen(ticket: ticket)),
           );
         },
-        child: Ink(
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFE8E8EE)),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFEEF0F4)),
           ),
-          child: Column(
-          children: [
-            SizedBox(
-              height: 120,
-              width: double.infinity,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (ticket.displayImage != null)
-                    DesignNetworkImage(url: ticket.displayImage)
-                  else
-                    ColoredBox(
-                      color: ticket.isPrivate
-                          ? EkaadhColors.brandLight
-                          : const Color(0xFFE2E8E4),
-                      child: ticket.isPrivate
-                          ? const Icon(Icons.mail_outline, color: EkaadhColors.brand, size: 40)
-                          : null,
-                    ),
-                  const ColoredBox(color: Color(0x61000000)),
-                  Positioned(
-                    left: 16,
-                    right: 16,
-                    bottom: 12,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(ticket.eventTitle ?? l10n.t('event'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
-                        Text(
-                          [
-                            if (ticket.eventDateLabel != null && ticket.eventDateLabel!.isNotEmpty)
-                              ticket.eventDateLabel!,
-                            if (ticket.eventTimeLabel != null && ticket.eventTimeLabel!.isNotEmpty)
-                              ticket.eventTimeLabel!,
-                            if (ticket.venue != null && ticket.venue!.isNotEmpty) ticket.venue!,
-                          ].join(' · '),
-                          style: const TextStyle(color: Colors.white70, fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Positioned(
-                    top: 12,
-                    left: 12,
-                    child: Row(
-                      children: [
-                        if (ticket.isPrivate)
-                          Container(
-                            margin: const EdgeInsets.only(right: 6),
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF7C3AED),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              l10n.t('invitation'),
-                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
-                            ),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  width: 52,
+                  height: 68,
+                  child: ticket.displayImage != null
+                      ? DesignNetworkImage(url: ticket.displayImage)
+                      : const ColoredBox(
+                          color: EkaadhColors.brandLight,
+                          child: Icon(
+                            Icons.event_available_outlined,
+                            color: EkaadhColors.brand,
+                            size: 22,
                           ),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
-                            color: ticket.status == 'valid' ? EkaadhColors.brand : const Color(0xFF9CA3AF),
+                            color: expired
+                                ? const Color(0xFFF3F4F6)
+                                : EkaadhColors.brandLight,
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
-                            ticket.status == 'valid' ? l10n.t('valid') : ticket.status[0].toUpperCase() + ticket.status.substring(1),
-                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
+                            statusLabel,
+                            style: TextStyle(
+                              color: expired
+                                  ? EkaadhColors.muted
+                                  : EkaadhColors.brand,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
+                        ),
+                        if (ticket.ticketTypeName.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF3F4F8),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                ticket.ticketTypeName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: EkaadhColors.dark,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                        const Spacer(),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          size: 20,
+                          color: EkaadhColors.soft,
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(ticket.ticketTypeName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: EkaadhColors.muted)),
-                        Text(ticket.ticketCode, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: EkaadhColors.brand, fontFamily: 'monospace')),
-                      ],
+                    const SizedBox(height: 6),
+                    Text(
+                      ticket.eventTitle ?? l10n.t('event'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                        letterSpacing: -0.2,
+                      ),
                     ),
-                  ),
-                  const Icon(Icons.qr_code_2, color: EkaadhColors.brand, size: 18),
-                  const SizedBox(width: 4),
-                  Text(l10n.t('view_qr'), style: const TextStyle(color: EkaadhColors.brand, fontWeight: FontWeight.w700, fontSize: 12)),
-                ],
+                    if (meta.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        meta,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: EkaadhColors.muted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 4),
+                    Text(
+                      expired
+                          ? ticket.ticketCode
+                          : '${l10n.t('view_qr')} · ${ticket.ticketCode}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: expired ? EkaadhColors.muted : EkaadhColors.brand,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
         ),
       ),
     );
@@ -424,9 +562,9 @@ class _GuestTicketsResult extends StatelessWidget {
                     ),
                   )
                 : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
                     itemCount: tickets.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 14),
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (_, i) => _TicketCard(ticket: tickets[i]),
                   ),
           ),
@@ -439,25 +577,17 @@ class _GuestTicketsResult extends StatelessWidget {
 class _GuestTicketsGate extends StatelessWidget {
   const _GuestTicketsGate({
     required this.phoneController,
-    required this.otpController,
     required this.lookingUp,
-    required this.otpSent,
-    required this.otpHint,
     required this.lookupError,
     required this.onSignIn,
     required this.onLookup,
-    required this.onResend,
   });
 
   final TextEditingController phoneController;
-  final TextEditingController otpController;
   final bool lookingUp;
-  final bool otpSent;
-  final String? otpHint;
   final String? lookupError;
   final VoidCallback onSignIn;
   final VoidCallback onLookup;
-  final VoidCallback onResend;
 
   @override
   Widget build(BuildContext context) {
@@ -537,28 +667,6 @@ class _GuestTicketsGate extends StatelessWidget {
                   borderRadius: 14,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                 ),
-                if (otpSent) ...[
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: otpController,
-                    keyboardType: TextInputType.number,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 6),
-                    decoration: EkaadhFields.decoration(
-                      hintText: l10n.t('confirmation_code'),
-                      radius: 14,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                    ),
-                  ),
-                  if (otpHint != null) ...[
-                    const SizedBox(height: 8),
-                    Text(otpHint!, style: const TextStyle(color: EkaadhColors.brand, fontWeight: FontWeight.w700, fontSize: 12)),
-                  ],
-                  TextButton(
-                    onPressed: lookingUp ? null : onResend,
-                    child: Text(l10n.t('resend_code'), style: const TextStyle(fontWeight: FontWeight.w700)),
-                  ),
-                ],
                 if (lookupError != null) ...[
                   const SizedBox(height: 10),
                   Text(lookupError!, style: const TextStyle(color: EkaadhColors.danger, fontSize: 13)),
@@ -581,7 +689,7 @@ class _GuestTicketsGate extends StatelessWidget {
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2, color: EkaadhColors.brand),
                           )
-                        : Text(otpSent ? l10n.t('verify_show_tickets') : l10n.t('find_tickets')),
+                        : Text(l10n.t('find_tickets')),
                   ),
                 ),
               ],
@@ -593,34 +701,5 @@ class _GuestTicketsGate extends StatelessWidget {
   }
 }
 
-class _TabBtn extends StatelessWidget {
-  const _TabBtn({required this.label, required this.active, required this.onTap});
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
 
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: active ? EkaadhColors.brand : Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 13,
-              color: active ? Colors.white : EkaadhColors.soft,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
+

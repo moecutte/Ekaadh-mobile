@@ -74,7 +74,7 @@ class _ScannerScreenState extends State<ScannerScreen>
     }
   }
 
-  Future<void> _handlePayload(String raw) async {
+  Future<void> _handlePayload(String raw, {bool manual = false}) async {
     if (_busy || _result != null) return;
     final payload = raw.trim();
     if (payload.isEmpty) return;
@@ -85,6 +85,7 @@ class _ScannerScreenState extends State<ScannerScreen>
       final result = await _service.scan(
         payload: payload,
         eventId: widget.event.id,
+        manual: manual,
       );
       if (!mounted) return;
       setState(() {
@@ -299,7 +300,7 @@ class _ScannerScreenState extends State<ScannerScreen>
                           ElevatedButton(
                             onPressed: _busy || _result != null
                                 ? null
-                                : () => _handlePayload(_manualController.text),
+                                : () => _handlePayload(_manualController.text, manual: true),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: EkaadhColors.brand,
                               foregroundColor: Colors.white,

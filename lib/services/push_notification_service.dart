@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+import 'package:ekaadh_mobile/core/api_client.dart';
 import 'package:ekaadh_mobile/core/api_config.dart';
 import 'package:ekaadh_mobile/firebase_options.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
@@ -71,13 +71,14 @@ class PushNotificationService {
 
   static Future<void> syncToken(AuthService auth) async {
     if (!_ready || auth.token == null) return;
+    if (auth.user?.pushNotificationsEnabled == false) return;
 
     final token = _fcmToken ?? await FirebaseMessaging.instance.getToken();
     if (token == null || token.isEmpty) return;
     _fcmToken = token;
 
     try {
-      await http.post(
+      await ApiClient.post(
         Uri.parse('${ApiConfig.baseUrl}/auth/device-token'),
         headers: {
           'Accept': 'application/json',
@@ -95,12 +96,34 @@ class PushNotificationService {
     }
   }
 
+  static Future<void> setEnabled(AuthService auth, bool enabled) async {
+    if (!enabled) {
+      await clearToken(auth);
+      if (_ready) {
+        try {
+          await FirebaseMessaging.instance.deleteToken();
+        } catch (_) {}
+        _fcmToken = null;
+      }
+      return;
+    }
+
+    await init();
+    if (_ready) {
+      try {
+        await FirebaseMessaging.instance.requestPermission(alert: true, badge: true, sound: true);
+        _fcmToken = await FirebaseMessaging.instance.getToken();
+      } catch (_) {}
+    }
+    await syncToken(auth);
+  }
+
   static Future<void> clearToken(AuthService auth) async {
     final token = _fcmToken;
     if (!_ready || auth.token == null || token == null) return;
 
     try {
-      await http.delete(
+      await ApiClient.delete(
         Uri.parse('${ApiConfig.baseUrl}/auth/device-token'),
         headers: {
           'Accept': 'application/json',

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:ekaadh_mobile/core/locale_scope.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
+import 'package:ekaadh_mobile/screens/otp_verification_screen.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/services/otp_service.dart';
 import 'package:ekaadh_mobile/widgets/ekaadh_logo.dart';
 import 'package:ekaadh_mobile/widgets/phone_number_field.dart';
+import 'package:ekaadh_mobile/core/user_facing_error.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({
@@ -25,11 +27,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _phone = TextEditingController();
   final _password = TextEditingController();
   final _confirm = TextEditingController();
-  final _otp = TextEditingController();
   bool _loading = false;
-  bool _otpSent = false;
-  String? _otpHint;
-  String? _otpToken;
   String? _error;
 
   @override
@@ -38,51 +36,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _phone.dispose();
     _password.dispose();
     _confirm.dispose();
-    _otp.dispose();
     super.dispose();
-  }
-
-  Future<void> _sendOtp() async {
-    final l10n = LocaleScope.of(context);
-    if (!PhoneNumberField.hasLocalNumber(_phone.text)) {
-      setState(() => _error = l10n.t('enter_phone'));
-      return;
-    }
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final result = await OtpService().send(
-        phone: PhoneNumberField.fullNumber(_phone.text),
-        purpose: OtpService.purposeRegister,
-      );
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _otpSent = true;
-        _otpHint = result.debugCode != null
-            ? '${l10n.t('testing_code')}: ${result.debugCode}'
-            : result.message;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = e.toString().replaceFirst('Exception: ', '');
-      });
-    }
   }
 
   Future<void> _submit() async {
     final l10n = LocaleScope.of(context);
-    if (!_otpSent) {
-      await _sendOtp();
+    if (_name.text.trim().isEmpty) {
+      setState(() => _error = l10n.t('enter_your_name'));
       return;
     }
-
-    if (_otp.text.trim().isEmpty) {
-      setState(() => _error = l10n.t('enter_confirmation_code'));
+    if (!PhoneNumberField.hasLocalNumber(_phone.text)) {
+      setState(() => _error = l10n.t('enter_phone'));
+      return;
+    }
+    if (_password.text.length < 8) {
+      setState(() => _error = l10n.t('min_8_chars'));
+      return;
+    }
+    if (_password.text != _confirm.text) {
+      setState(() => _error = l10n.t('password_mismatch'));
       return;
     }
 
@@ -92,43 +64,47 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      String? token = _otpToken;
-      if (token == null) {
-        final verified = await OtpService().verify(
-          phone: PhoneNumberField.fullNumber(_phone.text),
-          purpose: OtpService.purposeRegister,
-          otp: _otp.text.trim(),
-        );
-        token = verified.otpToken;
-        if (token == null) {
-          throw Exception(l10n.t('could_not_confirm_phone'));
-        }
-        _otpToken = token;
-      }
+      final sent = await OtpService().send(
+        phone: PhoneNumberField.fullNumber(_phone.text),
+        purpose: OtpService.purposeRegister,
+      );
+      if (!mounted) return;
+      setState(() => _loading = false);
 
+      final verified = await Navigator.of(context).push<OtpResult>(
+        MaterialPageRoute(
+          builder: (_) => OtpVerificationScreen(
+            phone: PhoneNumberField.fullNumber(_phone.text),
+            purpose: OtpService.purposeRegister,
+            alreadySent: true,
+            debugHint: sent.debugCode != null
+                ? '${l10n.t('testing_code')}: ${sent.debugCode}'
+                : null,
+          ),
+        ),
+      );
+      if (!mounted || verified?.otpToken == null) return;
+
+      setState(() => _loading = true);
       final error = await widget.auth.register(
         name: _name.text.trim(),
         phone: PhoneNumberField.fullNumber(_phone.text),
         password: _password.text,
         passwordConfirmation: _confirm.text,
-        otpToken: token,
+        otpToken: verified!.otpToken!,
       );
       if (!mounted) return;
       setState(() => _loading = false);
       if (error == null) {
         widget.onSignedIn();
       } else {
-        setState(() {
-          _error = error;
-          _otpToken = null;
-        });
+        setState(() => _error = UserFacingError.message(error, t: l10n.t));
       }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = e.toString().replaceFirst('Exception: ', '');
-        _otpToken = null;
+        _error = UserFacingError.message(e, t: LocaleScope.of(context).t);
       });
     }
   }
@@ -183,22 +159,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               _field(l10n.t('password'), _password, l10n.t('min_8_chars'), obscure: true),
               _field(l10n.t('confirm_password'), _confirm, l10n.t('reenter_password'), obscure: true),
-              if (_otpSent) ...[
-                const SizedBox(height: 4),
-                _field(l10n.t('confirmation_code'), _otp, '123456', keyboard: TextInputType.number),
-                if (_otpHint != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(
-                      _otpHint!,
-                      style: const TextStyle(color: EkaadhColors.brand, fontWeight: FontWeight.w700, fontSize: 13),
-                    ),
-                  ),
-                TextButton(
-                  onPressed: _loading ? null : _sendOtp,
-                  child: Text(l10n.t('resend_code'), style: const TextStyle(fontWeight: FontWeight.w700)),
-                ),
-              ],
               if (_error != null) ...[
                 const SizedBox(height: 8),
                 Text(_error!, style: const TextStyle(color: EkaadhColors.danger)),
@@ -221,7 +181,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           height: 22,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
-                      : Text(_otpSent ? l10n.t('verify_create_account') : l10n.t('send_confirmation_code')),
+                      : Text(l10n.t('send_confirmation_code')),
                 ),
               ),
             ],

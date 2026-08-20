@@ -1,6 +1,4 @@
-import 'dart:convert';
-
-import 'package:http/http.dart' as http;
+import 'package:ekaadh_mobile/core/api_client.dart';
 import 'package:ekaadh_mobile/core/api_config.dart';
 import 'package:ekaadh_mobile/models/event_model.dart';
 
@@ -22,12 +20,16 @@ class EventService {
     String? category,
     String? city,
     bool featured = false,
+    String when = 'upcoming',
+    String price = 'all',
   }) async {
     final page = await search(
       q: q,
       category: category,
       city: city,
       featured: featured,
+      when: when,
+      price: price,
     );
     return page.events;
   }
@@ -37,9 +39,13 @@ class EventService {
     String? category,
     String? city,
     bool featured = false,
+    String when = 'upcoming',
+    String price = 'all',
   }) async {
     final params = <String, String>{
       'per_page': '50',
+      'when': when == 'past' ? 'past' : 'upcoming',
+      if (price == 'free' || price == 'paid') 'price': price,
       if (q != null && q.isNotEmpty) 'q': q,
       if (category != null && category.isNotEmpty && category != 'All') 'category': category,
       if (city != null && city.isNotEmpty && city != 'All') 'city': city,
@@ -47,12 +53,12 @@ class EventService {
     };
 
     final uri = Uri.parse('${ApiConfig.baseUrl}/events').replace(queryParameters: params);
-    final response = await http.get(uri, headers: {'Accept': 'application/json'});
+    final response = await ApiClient.get(uri, headers: {'Accept': 'application/json'});
     if (response.statusCode != 200) {
-      throw Exception('Failed to load events (${response.statusCode})');
+      throw Exception('Could not load events. Please try again.');
     }
 
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = ApiClient.decode(response);
     final data = body['data'] as List<dynamic>? ?? [];
     final filters = body['filters'] as Map<String, dynamic>? ?? {};
     final categories = (filters['categories'] as List<dynamic>? ?? [])
@@ -72,14 +78,14 @@ class EventService {
   }
 
   Future<EventModel> show(String idOrSlug) async {
-    final response = await http.get(
+    final response = await ApiClient.get(
       Uri.parse('${ApiConfig.baseUrl}/events/$idOrSlug'),
       headers: {'Accept': 'application/json'},
     );
     if (response.statusCode != 200) {
-      throw Exception('Failed to load event');
+      throw Exception('Could not load this event. Please try again.');
     }
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final body = ApiClient.decode(response);
     final data = body['data'] as Map<String, dynamic>? ?? body;
     return EventModel.fromJson(data);
   }

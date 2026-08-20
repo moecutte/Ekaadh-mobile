@@ -6,6 +6,8 @@ import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/services/private_event_service.dart';
 import 'package:ekaadh_mobile/widgets/design_network_image.dart';
 import 'package:ekaadh_mobile/widgets/phone_number_field.dart';
+import 'package:ekaadh_mobile/core/user_facing_error.dart';
+import 'package:ekaadh_mobile/widgets/ekaadh_toast.dart';
 
 class _GuestRow {
   final name = TextEditingController();
@@ -40,6 +42,7 @@ class _PrivateEventSendInvitesScreenState
   final List<_GuestRow> _rows = [];
   bool _saving = false;
   String? _error;
+  String _channel = 'whatsapp';
 
   String? get _thumb =>
       widget.event.design?.previewImageUrl ?? widget.event.coverImage;
@@ -105,18 +108,21 @@ class _PrivateEventSendInvitesScreenState
       final created = await _service.sendInvitations(
         eventId: widget.event.id,
         guests: guests,
+        channel: _channel,
       );
       if (!mounted) return;
       final l10n = LocaleScope.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${l10n.t('sent_invitations')} $created ${l10n.t('invitations_count')}')),
+      await EkaadhToast.success(
+        context,
+        message: '${l10n.t('sent_invitations')} $created ${l10n.t('invitations_count')}',
       );
+      if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = UserFacingError.message(e, t: LocaleScope.of(context).t);
       });
     }
   }
@@ -256,6 +262,42 @@ class _PrivateEventSendInvitesScreenState
             ),
           ],
           const SizedBox(height: 18),
+          Text(
+            l10n.t('invite_send_via'),
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            l10n.t('invite_channel_hint'),
+            style: const TextStyle(
+              color: EkaadhColors.muted,
+              fontSize: 12,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _ChannelChoice(
+                  label: l10n.t('invite_channel_whatsapp'),
+                  icon: Icons.chat_rounded,
+                  selected: _channel == 'whatsapp',
+                  onTap: () => setState(() => _channel = 'whatsapp'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _ChannelChoice(
+                  label: l10n.t('invite_channel_sms'),
+                  icon: Icons.sms_rounded,
+                  selected: _channel == 'sms',
+                  onTap: () => setState(() => _channel = 'sms'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
           FilledButton(
             onPressed: _saving ? null : _submit,
             style: FilledButton.styleFrom(
@@ -377,6 +419,59 @@ class _PrivateEventSendInvitesScreenState
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ChannelChoice extends StatelessWidget {
+  const _ChannelChoice({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? EkaadhColors.brandLight : Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected ? EkaadhColors.brand : const Color(0xFFEEF0F4),
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(
+                icon,
+                color: selected ? EkaadhColors.brand : EkaadhColors.muted,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  color: selected ? EkaadhColors.brand : EkaadhColors.dark,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

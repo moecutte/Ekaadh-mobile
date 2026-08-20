@@ -6,6 +6,7 @@ import 'package:ekaadh_mobile/core/locale_service.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/services/support_service.dart';
+import 'package:ekaadh_mobile/widgets/ekaadh_toast.dart';
 
 class SupportScreen extends StatefulWidget {
   const SupportScreen({super.key, required this.auth});
@@ -92,9 +93,7 @@ class _SupportScreenState extends State<SupportScreen>
       });
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(LocaleScope.of(context).t('support_load_error'))),
-      );
+      await EkaadhToast.error(context, message: LocaleScope.of(context).t('support_load_error'));
     }
   }
 
@@ -134,9 +133,7 @@ class _SupportScreenState extends State<SupportScreen>
       _scrollToBottom();
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(LocaleScope.of(context).t('support_send_error'))),
-      );
+      await EkaadhToast.error(context, message: LocaleScope.of(context).t('support_send_error'));
     } finally {
       if (mounted) setState(() => _sending = false);
     }

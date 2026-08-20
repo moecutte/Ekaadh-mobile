@@ -53,6 +53,8 @@ class PrivateEventModel {
   final TicketDesignOption? design;
   final List<PrivateEventTicketType> ticketTypes;
   final Map<String, dynamic>? pendingOrder;
+  final bool paymentSandbox;
+  final List<PrivateEventTestWallet> testWallets;
 
   const PrivateEventModel({
     required this.id,
@@ -75,6 +77,8 @@ class PrivateEventModel {
     required this.design,
     required this.ticketTypes,
     required this.pendingOrder,
+    this.paymentSandbox = false,
+    this.testWallets = const [],
   });
 
   bool get isPaid => status == 'published';
@@ -121,6 +125,39 @@ class PrivateEventModel {
       design: designJson == null ? null : TicketDesignOption.fromJson(designJson),
       ticketTypes: types,
       pendingOrder: json['pending_order'] as Map<String, dynamic>?,
+      paymentSandbox: json['payment_sandbox'] as bool? ?? false,
+      testWallets: _parseTestWallets(json),
+    );
+  }
+
+  static List<PrivateEventTestWallet> _parseTestWallets(Map<String, dynamic> json) {
+    final parsed = (json['test_wallets'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(PrivateEventTestWallet.fromJson)
+        .where((w) => w.local.isNotEmpty)
+        .toList();
+    if (parsed.isNotEmpty) return parsed;
+    if (json['payment_sandbox'] == true) {
+      return const [
+        PrivateEventTestWallet(brand: 'EVCPlus', local: '611111111'),
+        PrivateEventTestWallet(brand: 'ZAAD', local: '631111111'),
+        PrivateEventTestWallet(brand: 'SAHAL', local: '901111111'),
+      ];
+    }
+    return const [];
+  }
+}
+
+class PrivateEventTestWallet {
+  final String brand;
+  final String local;
+
+  const PrivateEventTestWallet({required this.brand, required this.local});
+
+  factory PrivateEventTestWallet.fromJson(Map<String, dynamic> json) {
+    return PrivateEventTestWallet(
+      brand: json['brand'] as String? ?? '',
+      local: json['local'] as String? ?? '',
     );
   }
 }
@@ -395,6 +432,7 @@ class InvitationModel {
   final String status;
   final String smsStatus;
   final String whatsappStatus;
+  final String? deliveryChannel;
   final String? invitationUrl;
   final String? ticketTypeName;
   final int? ticketTypeId;
@@ -408,6 +446,7 @@ class InvitationModel {
     required this.status,
     required this.smsStatus,
     required this.whatsappStatus,
+    this.deliveryChannel,
     required this.invitationUrl,
     required this.ticketTypeName,
     required this.ticketTypeId,
@@ -415,6 +454,16 @@ class InvitationModel {
   });
 
   bool get isActive => status == 'active';
+
+  String deliveryLabel(String Function(String) t) {
+    if (deliveryChannel == 'whatsapp') {
+      return '${t('invite_channel_whatsapp')} · $whatsappStatus';
+    }
+    if (deliveryChannel == 'sms') {
+      return '${t('invite_channel_sms')} · $smsStatus';
+    }
+    return '${t('invite_channel_sms')} $smsStatus · ${t('invite_channel_whatsapp')} $whatsappStatus';
+  }
 
   factory InvitationModel.fromJson(Map<String, dynamic> json) {
     final type = json['ticket_type'] as Map<String, dynamic>?;
@@ -426,6 +475,7 @@ class InvitationModel {
       status: json['status'] as String? ?? 'active',
       smsStatus: json['sms_status'] as String? ?? 'pending',
       whatsappStatus: json['whatsapp_status'] as String? ?? 'pending',
+      deliveryChannel: json['delivery_channel'] as String?,
       invitationUrl: json['invitation_url'] as String?,
       ticketTypeName: type?['name'] as String?,
       ticketTypeId: type?['id'] as int?,

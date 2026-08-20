@@ -5,6 +5,7 @@ class UserModel {
   final String? phone;
   final String role;
   final String status;
+  final bool pushNotificationsEnabled;
 
   const UserModel({
     required this.id,
@@ -13,6 +14,7 @@ class UserModel {
     required this.phone,
     required this.role,
     required this.status,
+    this.pushNotificationsEnabled = true,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -23,6 +25,7 @@ class UserModel {
       phone: json['phone'] as String?,
       role: json['role'] as String,
       status: json['status'] as String,
+      pushNotificationsEnabled: json['push_notifications_enabled'] as bool? ?? true,
     );
   }
 }

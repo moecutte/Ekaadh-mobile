@@ -6,7 +6,10 @@ import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/services/private_event_service.dart';
 import 'package:ekaadh_mobile/screens/private_event_pay_screen.dart';
 import 'package:ekaadh_mobile/widgets/design_network_image.dart';
-import 'package:ekaadh_mobile/widgets/invitation_overlay_preview.dart';
+import 'package:ekaadh_mobile/widgets/ekaadh_date_picker.dart';
+import 'package:ekaadh_mobile/widgets/ekaadh_wizard.dart';
+import 'package:ekaadh_mobile/widgets/invitation_theme_preview.dart';
+import 'package:ekaadh_mobile/core/user_facing_error.dart';
 
 class PrivateEventCreateScreen extends StatefulWidget {
   const PrivateEventCreateScreen({super.key, required this.auth});
@@ -79,7 +82,7 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = UserFacingError.message(e, t: LocaleScope.of(context).t);
         _loadingMeta = false;
       });
     }
@@ -250,9 +253,24 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
   String _fmtTime(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
+  String _fmtDateDisplay(DateTime d) {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return '${days[d.weekday - 1]}, ${d.day} ${_monthName(d.month)} ${d.year}';
+  }
+
+  String get _categoryName {
+    final id = _categoryId;
+    final meta = _meta;
+    if (id == null || meta == null) return '—';
+    for (final c in meta.categories) {
+      if (c.id == id) return c.name;
+    }
+    return '—';
+  }
+
   Future<void> _pickDate() async {
     final now = DateTime.now();
-    final picked = await showDatePicker(
+    final picked = await showEkaadhDatePicker(
       context: context,
       initialDate: _date ?? now,
       firstDate: now,
@@ -267,13 +285,27 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
   }
 
   Future<void> _pickTime() async {
-    final picked = await showTimePicker(context: context, initialTime: _time);
+    final picked = await showEkaadhTimePicker(context: context, initialTime: _time);
     if (picked != null) {
       setState(() {
         _time = picked;
         _applyBasicsToFieldValues();
       });
     }
+  }
+
+  Future<void> _pickCategory() async {
+    final meta = _meta;
+    if (meta == null || meta.categories.isEmpty) return;
+    final picked = await showEkaadhOptionPicker<int>(
+      context: context,
+      title: LocaleScope.of(context).t('select_category'),
+      selected: _categoryId,
+      options: [
+        for (final c in meta.categories) (c.id, c.name),
+      ],
+    );
+    if (picked != null) _onCategoryChanged(picked);
   }
 
   TextInputType _keyboardFor(InvitationDesignFieldOption field) {
@@ -418,7 +450,7 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = UserFacingError.message(e, t: LocaleScope.of(context).t);
       });
     }
   }
@@ -436,58 +468,54 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
         ),
       );
 
+  static const _pagePad = EdgeInsets.fromLTRB(20, 4, 20, 24);
+
   @override
   Widget build(BuildContext context) {
     final l10n = LocaleScope.of(context);
-    final steps = _stepLabels(context);
+    final isLast = _step == 3;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: EkaadhColors.surface,
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              steps[_step],
-              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
-            ),
-            Text(
-              '${l10n.t('step_of')} ${_step + 1} ${l10n.t('of')} 4',
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-                color: EkaadhColors.muted,
-              ),
-            ),
-          ],
+        title: Text(
+          l10n.t('create_private_event'),
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
         ),
         backgroundColor: Colors.white,
         foregroundColor: EkaadhColors.dark,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        leading: _step > 0
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back_rounded),
-                onPressed: _backStep,
-              )
-            : IconButton(
-                icon: const Icon(Icons.close_rounded),
-                onPressed: () => Navigator.pop(context),
-              ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () {
+            if (_step > 0) {
+              _backStep();
+            } else {
+              Navigator.pop(context);
+            }
+          },
+        ),
       ),
       body: _loadingMeta
           ? const Center(child: CircularProgressIndicator(color: EkaadhColors.brand))
           : Column(
               children: [
-                _stepIndicator(),
+                ColoredBox(
+                  color: Colors.white,
+                  child: EkaadhWizardStepper(
+                    labels: _stepLabels(context),
+                    current: _step,
+                  ),
+                ),
                 if (_error != null)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: const Color(0xFFFEF2F2),
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         _error!,
@@ -512,158 +540,75 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
                     ],
                   ),
                 ),
-                _bottomBar(),
+                EkaadhWizardFooter(
+                  loading: _saving,
+                  primaryLabel: isLast
+                      ? '${l10n.t('proceed_to_payment')} · \$${_total.toStringAsFixed(2)}'
+                      : l10n.t('next'),
+                  onPrimary: isLast ? _submit : _nextStep,
+                  onBack: () {
+                    if (_step > 0) {
+                      _backStep();
+                    } else {
+                      Navigator.pop(context);
+                    }
+                  },
+                ),
               ],
             ),
     );
   }
 
-  Widget _stepIndicator() {
-    final steps = _stepLabels(context);
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-      child: Row(
-        children: List.generate(4, (i) {
-          final active = i == _step;
-          final done = i < _step;
-          return Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(right: i < 3 ? 6 : 0),
-              child: Column(
-                children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    height: 3,
-                    decoration: BoxDecoration(
-                      color: active || done
-                          ? EkaadhColors.brand
-                          : const Color(0xFFE8EAF0),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    steps[i],
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: active ? FontWeight.w800 : FontWeight.w600,
-                      color: active ? EkaadhColors.brand : EkaadhColors.muted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-
-  Widget _bottomBar() {
-    final isLast = _step == 3;
-    return Container(
-      padding: EdgeInsets.fromLTRB(20, 14, 20, 14 + MediaQuery.paddingOf(context).bottom),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFE8EAF0))),
-      ),
-      child: Row(
-        children: [
-          if (_step > 0)
-            OutlinedButton(
-              onPressed: _saving ? null : _backStep,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: EkaadhColors.dark,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                side: const BorderSide(color: EkaadhColors.fieldBorder),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-              child: Text(LocaleScope.of(context).t('back'), style: const TextStyle(fontWeight: FontWeight.w800)),
-            ),
-          if (_step > 0) const SizedBox(width: 10),
-          Expanded(
-            child: FilledButton(
-              onPressed: _saving
-                  ? null
-                  : isLast
-                      ? _submit
-                      : _nextStep,
-              style: FilledButton.styleFrom(
-                backgroundColor: EkaadhColors.brand,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
-              ),
-              child: _saving
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : Text(
-                      isLast
-                          ? '${LocaleScope.of(context).t('continue_to_payment_amount')} · \$${_total.toStringAsFixed(2)}'
-                          : LocaleScope.of(context).t('continue'),
-                    ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _stepEventInfo() {
+    final l10n = LocaleScope.of(context);
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      padding: _pagePad,
       children: [
-        Text(
-          LocaleScope.of(context).t('event_info_hint'),
-          style: TextStyle(color: EkaadhColors.muted, fontSize: 13, height: 1.4),
-        ),
-        const SizedBox(height: 16),
-        _card([
-          _label(LocaleScope.of(context).t('category_required')),
-          if (_meta != null && _meta!.categories.isNotEmpty)
-            DropdownButtonFormField<int>(
-              key: ValueKey(_categoryId ?? 'category'),
-              initialValue: _categoryId,
-              decoration: EkaadhFields.decoration(hintText: LocaleScope.of(context).t('select_category')),
-              items: _meta!.categories
-                  .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
-                  .toList(),
-              onChanged: _onCategoryChanged,
+        EkaadhWizardSection(
+          title: l10n.t('event_details'),
+          child: EkaadhWizardCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _label(l10n.t('category_required')),
+                if (_meta != null && _meta!.categories.isNotEmpty)
+                  EkaadhWizardSelectField(
+                    value: _categoryName == '—' ? null : _categoryName,
+                    placeholder: l10n.t('select_category'),
+                    onTap: _pickCategory,
+                  ),
+                const SizedBox(height: 16),
+                _label(l10n.t('description_required')),
+                TextField(
+                  controller: _description,
+                  maxLines: 4,
+                  decoration: EkaadhFields.form(hintText: l10n.t('about_your_event')),
+                ),
+                const SizedBox(height: 16),
+                _label(l10n.t('venue_required')),
+                TextField(
+                  controller: _venue,
+                  decoration: EkaadhFields.form(hintText: l10n.t('venue_name')),
+                ),
+              ],
             ),
-          const SizedBox(height: 12),
-          _label(LocaleScope.of(context).t('description_required')),
-          TextField(
-            controller: _description,
-            maxLines: 4,
-            decoration: EkaadhFields.decoration(hintText: LocaleScope.of(context).t('about_your_event')),
           ),
-          const SizedBox(height: 12),
-          Row(
+        ),
+        const SizedBox(height: 22),
+        EkaadhWizardSection(
+          title: l10n.t('date_time_on_card'),
+          child: Row(
             children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _label(LocaleScope.of(context).t('date_required')),
-                    OutlinedButton(
-                      onPressed: _pickDate,
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 52),
-                        backgroundColor: EkaadhColors.surface,
-                        side: const BorderSide(color: EkaadhColors.fieldBorder),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      ),
-                      child: Text(
-                        _date == null ? LocaleScope.of(context).t('pick_date') : _fmtDate(_date!),
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
+                    _label(l10n.t('date_required')),
+                    EkaadhWizardIconField(
+                      icon: Icons.calendar_today_outlined,
+                      value: _date != null ? _fmtDateDisplay(_date!) : null,
+                      placeholder: l10n.t('pick_date'),
+                      onTap: _pickDate,
                     ),
                   ],
                 ),
@@ -673,214 +618,276 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _label(LocaleScope.of(context).t('time_required')),
-                    OutlinedButton(
-                      onPressed: _pickTime,
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 52),
-                        backgroundColor: EkaadhColors.surface,
-                        side: const BorderSide(color: EkaadhColors.fieldBorder),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      ),
-                      child: Text(
-                        _fmtTimeLabel(_time),
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
+                    _label(l10n.t('time_required')),
+                    EkaadhWizardIconField(
+                      icon: Icons.schedule_rounded,
+                      value: _fmtTimeLabel(_time),
+                      placeholder: l10n.t('time_required'),
+                      onTap: _pickTime,
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          _label(LocaleScope.of(context).t('venue_required')),
-          TextField(
-            controller: _venue,
-            decoration: EkaadhFields.decoration(hintText: LocaleScope.of(context).t('venue_name')),
-          ),
-        ]),
+        ),
       ],
     );
   }
 
   Widget _stepDesign() {
+    final l10n = LocaleScope.of(context);
+    final meta = _meta;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      padding: _pagePad,
       children: [
-        Text(
-          LocaleScope.of(context).t('choose_design_hint'),
-          style: TextStyle(color: EkaadhColors.muted, fontSize: 13, height: 1.4),
-        ),
-        const SizedBox(height: 16),
-        if (_meta != null) ...[
-          _card([
-            if (_meta!.designsForCategory(_categoryId).isEmpty)
-              Text(
-                LocaleScope.of(context).t('no_designs_category'),
-                style: const TextStyle(color: EkaadhColors.muted, fontSize: 13),
-              )
-            else ...[
-              Text(
-                '${LocaleScope.of(context).t('premium_adds')} \$${_meta!.premiumDesignSurcharge.toStringAsFixed(2)}${LocaleScope.of(context).t('per_ticket')}',
-                style: const TextStyle(color: EkaadhColors.muted, fontSize: 12),
+        if (meta != null) ...[
+          if (meta.standardForCategory(_categoryId).isNotEmpty) ...[
+            EkaadhWizardSection(
+              title: l10n.t('standard'),
+              child: _designGrid(meta.standardForCategory(_categoryId)),
+            ),
+            const SizedBox(height: 22),
+          ],
+          if (meta.premiumForCategory(_categoryId).isNotEmpty)
+            EkaadhWizardSection(
+              title: l10n.t('premium'),
+              trailing: Text(
+                '${l10n.t('premium_adds')} \$${meta.premiumDesignSurcharge.toStringAsFixed(0)}${l10n.t('per_ticket')}',
+                style: const TextStyle(
+                  color: EkaadhColors.muted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-              const SizedBox(height: 14),
-              if (_meta!.standardForCategory(_categoryId).isNotEmpty) ...[
-                _label(LocaleScope.of(context).t('standard')),
-                const SizedBox(height: 8),
-                _designGrid(_meta!.standardForCategory(_categoryId)),
-              ],
-              if (_meta!.premiumForCategory(_categoryId).isNotEmpty) ...[
-                const SizedBox(height: 14),
-                _label(LocaleScope.of(context).t('premium')),
-                const SizedBox(height: 8),
-                _designGrid(_meta!.premiumForCategory(_categoryId)),
-              ],
-            ],
-          ]),
+              child: _designGrid(meta.premiumForCategory(_categoryId)),
+            ),
+          if (meta.designsForCategory(_categoryId).isEmpty)
+            EkaadhWizardCard(
+              child: Text(
+                l10n.t('no_designs_category'),
+                style: const TextStyle(color: EkaadhColors.muted, fontSize: 13),
+              ),
+            ),
         ],
       ],
     );
   }
 
   Widget _stepInvitationText() {
+    final l10n = LocaleScope.of(context);
     final design = _selectedDesign;
     if (design == null) {
       return Center(
-        child: Text(LocaleScope.of(context).t('select_design_first'), style: TextStyle(color: EkaadhColors.muted)),
+        child: Text(l10n.t('select_design_first'), style: const TextStyle(color: EkaadhColors.muted)),
       );
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      padding: _pagePad,
       children: [
-        Text(
-          LocaleScope.of(context).t('preview_edit_hint'),
-          style: TextStyle(color: EkaadhColors.muted, fontSize: 13, height: 1.4),
-        ),
-        const SizedBox(height: 16),
-        _card([
-          Row(
-            children: [
-              Text(LocaleScope.of(context).t('live_preview'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: EkaadhColors.brandLight,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  design.isPremium ? LocaleScope.of(context).t('premium') : LocaleScope.of(context).t('standard'),
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: EkaadhColors.brand),
-                ),
+        EkaadhWizardSection(
+          title: l10n.t('live_preview'),
+          trailing: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: EkaadhColors.brandLight,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              design.isPremium ? l10n.t('premium') : l10n.t('standard'),
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: EkaadhColors.brand,
               ),
-            ],
+            ),
           ),
-          const SizedBox(height: 12),
-          InvitationOverlayPreview(design: design, fieldValues: _fieldValues),
-        ]),
+          child: EkaadhWizardCard(
+            elevated: true,
+            child: InvitationThemePreview(design: design, fieldValues: _fieldValues),
+          ),
+        ),
         if (design.buyerFields.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          _card([
-            Text(
-              LocaleScope.of(context).t('invitation_text'),
-              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              LocaleScope.of(context).t('invitation_text_hint'),
-              style: const TextStyle(color: EkaadhColors.muted, fontSize: 12),
-            ),
-            const SizedBox(height: 14),
-            for (final field in design.buyerFields) ...[
-              _label('${field.label}${field.isRequired ? ' *' : ''}'),
-              TextField(
-                controller: _fieldControllers[field.fieldKey],
-                keyboardType: _keyboardFor(field),
-                maxLines: field.fieldType == 'textarea' ? 3 : 1,
-                decoration: EkaadhFields.decoration(
-                  hintText: field.placeholder ?? field.defaultText ?? '',
-                ),
+          const SizedBox(height: 22),
+          EkaadhWizardSection(
+            title: l10n.t('invitation_text'),
+            child: EkaadhWizardCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.t('invitation_text_hint'),
+                    style: const TextStyle(color: EkaadhColors.muted, fontSize: 12, height: 1.4),
+                  ),
+                  const SizedBox(height: 14),
+                  for (final field in design.buyerFields) ...[
+                    _label('${field.label}${field.isRequired ? ' *' : ''}'),
+                    TextField(
+                      controller: _fieldControllers[field.fieldKey],
+                      keyboardType: _keyboardFor(field),
+                      maxLines: field.fieldType == 'textarea' ? 3 : 1,
+                      decoration: EkaadhFields.form(
+                        hintText: field.placeholder ?? field.defaultText ?? '',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                ],
               ),
-              const SizedBox(height: 10),
-            ],
-          ]),
+            ),
+          ),
         ] else if (design.autoDateFields.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          _card([
-            Text(
-              LocaleScope.of(context).t('date_time_on_card'),
-              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+          const SizedBox(height: 22),
+          EkaadhWizardCard(
+            child: Text(
+              l10n.t('date_time_auto_hint'),
+              style: const TextStyle(color: EkaadhColors.muted, fontSize: 13, height: 1.4),
             ),
-            const SizedBox(height: 6),
-            Text(
-              LocaleScope.of(context).t('date_time_auto_hint'),
-              style: const TextStyle(color: EkaadhColors.muted, fontSize: 12),
-            ),
-          ]),
+          ),
         ],
       ],
     );
   }
 
   Widget _stepPayment() {
+    final l10n = LocaleScope.of(context);
+    final design = _selectedDesign;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      padding: _pagePad,
       children: [
-        Text(
-          LocaleScope.of(context).t('set_qty_review'),
-          style: TextStyle(color: EkaadhColors.muted, fontSize: 13, height: 1.4),
-        ),
-        const SizedBox(height: 16),
-        _card([
-          _label(LocaleScope.of(context).t('ticket_quantity')),
-          Row(
-            children: [
-              IconButton(
-                onPressed: _qty > 1 ? () => setState(() => _qty--) : null,
-                icon: const Icon(Icons.remove_circle_outline),
-                color: EkaadhColors.brand,
-              ),
-              Text('$_qty', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-              IconButton(
-                onPressed: _meta != null && _qty < _meta!.maxTickets
-                    ? () => setState(() => _qty++)
-                    : null,
-                icon: const Icon(Icons.add_circle_outline),
-                color: EkaadhColors.brand,
-              ),
-              const Spacer(),
-              Text(
-                '\$${_unitNow.toStringAsFixed(2)} each',
-                style: const TextStyle(color: EkaadhColors.muted, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          _label(LocaleScope.of(context).t('ticket_label')),
-          TextField(
-            controller: _ticketLabel,
-            decoration: EkaadhFields.decoration(hintText: 'Invitation'),
-          ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: EkaadhColors.brandLight,
-              borderRadius: BorderRadius.circular(14),
+        if (design != null) ...[
+          EkaadhWizardSection(
+            title: l10n.t('live_preview'),
+            child: EkaadhWizardCard(
+              elevated: true,
+              child: InvitationThemePreview(design: design, fieldValues: _fieldValues),
             ),
+          ),
+          const SizedBox(height: 22),
+        ],
+        EkaadhWizardSection(
+          title: l10n.t('review_settings'),
+          child: EkaadhWizardCard(
             child: Column(
               children: [
-                _totalRow(LocaleScope.of(context).t('price_per_ticket'), _unitNow),
-                _totalRow('Subtotal', _subtotal),
-                _totalRow(LocaleScope.of(context).t('service_fee'), _meta?.serviceFee ?? 0),
-                const Divider(height: 18),
-                _totalRow(LocaleScope.of(context).t('total_due'), _total, bold: true),
+                EkaadhWizardSummaryRow(label: l10n.t('category_required'), value: _categoryName),
+                const Divider(height: 1, color: Color(0xFFEEF0F4)),
+                EkaadhWizardSummaryRow(
+                  label: l10n.t('date_required'),
+                  value: _date != null ? _fmtDateDisplay(_date!) : '—',
+                ),
+                const Divider(height: 1, color: Color(0xFFEEF0F4)),
+                EkaadhWizardSummaryRow(label: l10n.t('time_required'), value: _fmtTimeLabel(_time)),
+                const Divider(height: 1, color: Color(0xFFEEF0F4)),
+                EkaadhWizardSummaryRow(
+                  label: l10n.t('venue_required'),
+                  value: _venue.text.trim().isEmpty ? '—' : _venue.text.trim(),
+                ),
+                const Divider(height: 1, color: Color(0xFFEEF0F4)),
+                EkaadhWizardSummaryRow(
+                  label: l10n.t('design'),
+                  value: design?.name.isNotEmpty == true
+                      ? design!.name
+                      : (design?.isPremium == true ? l10n.t('premium') : l10n.t('standard')),
+                ),
               ],
             ),
           ),
-        ]),
+        ),
+        const SizedBox(height: 22),
+        EkaadhWizardSection(
+          title: l10n.t('ticket_settings'),
+          trailing: Text(
+            '\$${_unitNow.toStringAsFixed(2)} ${l10n.t('each')}',
+            style: const TextStyle(
+              color: EkaadhColors.brand,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          child: EkaadhWizardCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _label(l10n.t('ticket_quantity')),
+                Container(
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: EkaadhColors.fieldBorder),
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        onPressed: _qty > 1 ? () => setState(() => _qty--) : null,
+                        icon: const Icon(Icons.remove_rounded),
+                        color: EkaadhColors.brand,
+                      ),
+                      Expanded(
+                        child: Text(
+                          '$_qty',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: _meta != null && _qty < _meta!.maxTickets
+                            ? () => setState(() => _qty++)
+                            : null,
+                        icon: const Icon(Icons.add_rounded),
+                        color: EkaadhColors.brand,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _label(l10n.t('ticket_label')),
+                TextField(
+                  controller: _ticketLabel,
+                  decoration: EkaadhFields.form(hintText: 'Invitation'),
+                ),
+                const SizedBox(height: 16),
+                EkaadhWizardSummaryRow(
+                  label: l10n.t('price_per_ticket'),
+                  value: '\$${_unitNow.toStringAsFixed(2)}',
+                ),
+                const Divider(height: 1, color: Color(0xFFEEF0F4)),
+                EkaadhWizardSummaryRow(
+                  label: l10n.t('subtotal'),
+                  value: '\$${_subtotal.toStringAsFixed(2)}',
+                ),
+                const Divider(height: 1, color: Color(0xFFEEF0F4)),
+                EkaadhWizardSummaryRow(
+                  label: l10n.t('service_fee'),
+                  value: '\$${(_meta?.serviceFee ?? 0).toStringAsFixed(2)}',
+                ),
+                const Divider(height: 1, color: Color(0xFFEEF0F4)),
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        l10n.t('total_due'),
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                      ),
+                      Text(
+                        '\$${_total.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 18,
+                          color: EkaadhColors.brand,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -911,9 +918,7 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: selected
-                ? (d.isPremium ? const Color(0xFFF59E0B) : EkaadhColors.brand)
-                : EkaadhColors.fieldBorder,
+            color: selected ? EkaadhColors.brand : EkaadhColors.fieldBorder,
             width: selected ? 2 : 1,
           ),
         ),
@@ -969,46 +974,5 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
     var h = hex.replaceFirst('#', '');
     if (h.length == 6) h = 'FF$h';
     return Color(int.parse(h, radix: 16));
-  }
-
-  Widget _totalRow(String label, double amount, {bool bold = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontWeight: bold ? FontWeight.w900 : FontWeight.w600,
-              color: bold ? EkaadhColors.dark : EkaadhColors.muted,
-            ),
-          ),
-          Text(
-            '\$${amount.toStringAsFixed(2)}',
-            style: TextStyle(
-              fontWeight: bold ? FontWeight.w900 : FontWeight.w700,
-              color: bold ? EkaadhColors.brand : EkaadhColors.dark,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _card(List<Widget> children) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFEEF0F4)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: children,
-      ),
-    );
   }
 }

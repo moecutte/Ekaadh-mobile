@@ -69,7 +69,7 @@ class _HomeShellState extends State<HomeShell> {
         builder: (_) => Scaffold(
           backgroundColor: EkaadhColors.surface,
           appBar: AppBar(
-            backgroundColor: Colors.white,
+            backgroundColor: EkaadhColors.surface,
             foregroundColor: EkaadhColors.dark,
             elevation: 0,
           ),
@@ -89,6 +89,7 @@ class _HomeShellState extends State<HomeShell> {
         userName: user?.name ?? l10n.t('guest'),
         auth: widget.auth,
         onOpenSearch: _openSearch,
+        onRequestSignIn: _openLogin,
       ),
       MyTicketsTab(
         auth: widget.auth,

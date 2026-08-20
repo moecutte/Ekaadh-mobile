@@ -5,11 +5,16 @@ import 'package:ekaadh_mobile/core/theme.dart';
 import 'package:ekaadh_mobile/models/event_model.dart';
 import 'package:ekaadh_mobile/models/order_model.dart';
 import 'package:ekaadh_mobile/screens/order_confirmation_screen.dart';
+import 'package:ekaadh_mobile/screens/otp_verification_screen.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/services/checkout_service.dart';
 import 'package:ekaadh_mobile/services/otp_service.dart';
 import 'package:ekaadh_mobile/widgets/design_network_image.dart';
+import 'package:ekaadh_mobile/widgets/operator_logos.dart';
 import 'package:ekaadh_mobile/widgets/phone_number_field.dart';
+import 'package:ekaadh_mobile/widgets/wallet_pin_dialog.dart';
+import 'package:ekaadh_mobile/core/user_facing_error.dart';
+import 'package:ekaadh_mobile/widgets/ekaadh_toast.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({
@@ -31,30 +36,25 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
-  static const _serviceFee = 1.0;
-
   late int _step;
   late Map<int, int> _qty;
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
-  final _otp = TextEditingController();
-  String? _pay;
+  String _pay = 'waafipay';
   bool _loading = false;
   bool _forceFail = false;
   String? _error;
   bool _signedIn = false;
   String? _otpToken;
-  String? _otpHint;
+  String? _otpPhone;
 
   List<String> _stepLabels(BuildContext context) {
     final l10n = LocaleScope.of(context);
-    return _signedIn
-        ? [l10n.t('step_select_tickets'), l10n.t('step_your_details'), l10n.t('step_payment')]
-        : [l10n.t('step_select_tickets'), l10n.t('step_your_details'), l10n.t('step_confirm'), l10n.t('step_payment')];
+    return [l10n.t('step_select_tickets'), l10n.t('step_your_details'), l10n.t('step_payment')];
   }
 
-  int get _paymentStep => _signedIn ? 3 : 4;
+  int get _paymentStep => 3;
   int get _maxStep => _paymentStep;
 
   @override
@@ -79,7 +79,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _name.dispose();
     _email.dispose();
     _phone.dispose();
-    _otp.dispose();
     super.dispose();
   }
 
@@ -92,6 +91,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
     return sum;
   }
+
+  double get _serviceFee => widget.event.serviceFee;
 
   double get _total => _ticketCount > 0 ? _subtotal + _serviceFee : 0;
 
@@ -124,72 +125,56 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _goStep(3);
       return;
     }
-    await _sendCheckoutOtp(thenGoToConfirm: true);
+    await _confirmPhoneThenPay();
   }
 
-  Future<void> _sendCheckoutOtp({bool thenGoToConfirm = false}) async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final result = await OtpService().send(
-        phone: PhoneNumberField.fullNumber(_phone.text),
-        purpose: OtpService.purposeCheckout,
-      );
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _otpHint = result.debugCode != null
-            ? '${LocaleScope.of(context).t('testing_code')}: ${result.debugCode}'
-            : result.message;
-        _otpToken = null;
-        if (thenGoToConfirm) _step = 3;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = e.toString().replaceFirst('Exception: ', '');
-      });
-    }
-  }
-
-  Future<void> _verifyCheckoutOtp() async {
+  Future<void> _confirmPhoneThenPay() async {
     final l10n = LocaleScope.of(context);
-    if (_otp.text.trim().isEmpty) {
-      setState(() => _error = l10n.t('enter_confirmation_code'));
-      return;
-    }
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final result = await OtpService().verify(
+      final sent = await OtpService().send(
         phone: PhoneNumberField.fullNumber(_phone.text),
         purpose: OtpService.purposeCheckout,
-        otp: _otp.text.trim(),
       );
       if (!mounted) return;
+      setState(() => _loading = false);
+
+      final verified = await Navigator.of(context).push<OtpResult>(
+        MaterialPageRoute(
+          builder: (_) => OtpVerificationScreen(
+            phone: PhoneNumberField.fullNumber(_phone.text),
+            purpose: OtpService.purposeCheckout,
+            alreadySent: true,
+            debugHint: sent.debugCode != null
+                ? '${l10n.t('testing_code')}: ${sent.debugCode}'
+                : null,
+          ),
+        ),
+      );
+      if (!mounted || verified?.otpToken == null) return;
+
       setState(() {
-        _loading = false;
-        _otpToken = result.otpToken;
-        _step = 4;
+        _otpToken = verified!.otpToken;
+        _otpPhone = PhoneNumberField.fullNumber(_phone.text);
+        _step = _paymentStep;
+        _error = null;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = UserFacingError.message(e, t: LocaleScope.of(context).t);
       });
     }
   }
 
   Future<void> _payNow() async {
     final l10n = LocaleScope.of(context);
-    if (_pay == null) {
-      setState(() => _error = l10n.t('choose_zaad_edahab'));
+    if (widget.event.isExpired) {
+      setState(() => _error = l10n.t('event_expired_hint'));
       return;
     }
     if (_name.text.trim().isEmpty || !PhoneNumberField.hasLocalNumber(_phone.text)) {
@@ -201,11 +186,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
     if (!_signedIn && (_otpToken == null || _otpToken!.isEmpty)) {
-      setState(() {
-        _error = l10n.t('confirm_phone_first');
-        _step = 3;
-      });
+      await _confirmPhoneThenPay();
       return;
+    }
+
+    String? walletPin;
+    if (widget.event.paymentSandbox) {
+      walletPin = await showWalletPinDialog(context);
+      if (!mounted || walletPin == null || walletPin.isEmpty) return;
     }
 
     setState(() {
@@ -229,15 +217,30 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         buyerName: _name.text.trim(),
         buyerPhone: PhoneNumberField.fullNumber(_phone.text),
         buyerEmail: _email.text.trim().isEmpty ? null : _email.text.trim(),
-        paymentMethod: _pay!,
+        paymentMethod: _pay,
         items: items,
         forceFail: _forceFail,
         token: widget.auth?.token,
         otpToken: _signedIn ? null : _otpToken,
+        otpPhone: _signedIn ? null : _otpPhone,
+        walletPin: walletPin,
+        locale: LocaleScope.of(context).code,
       );
 
       if (!mounted) return;
       Navigator.of(context).pop();
+      if (order.status == 'pending') {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => PaymentPendingScreen(
+              order: order,
+              buyerPhone: PhoneNumberField.fullNumber(_phone.text),
+            ),
+          ),
+          (route) => route.isFirst,
+        );
+        return;
+      }
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => OrderConfirmationScreen(order: order)),
         (route) => route.isFirst,
@@ -256,13 +259,39 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       Navigator.of(context).pop();
       setState(() {
         _loading = false;
-        _error = e.toString().replaceFirst('Exception: ', '');
+        _error = UserFacingError.message(e, t: LocaleScope.of(context).t);
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
+    if (widget.event.isExpired) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          title: Text(l10n.t('expired'), style: const TextStyle(fontWeight: FontWeight.w900)),
+          leading: IconButton(
+            icon: const Icon(Icons.chevron_left),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(widget.event.title, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
+              const SizedBox(height: 8),
+              Text(widget.event.eventDateLabel ?? '', style: const TextStyle(color: EkaadhColors.muted)),
+              const SizedBox(height: 16),
+              Text(l10n.t('event_expired_hint'), textAlign: TextAlign.center, style: const TextStyle(color: EkaadhColors.muted, height: 1.4)),
+            ],
+          ),
+        ),
+      );
+    }
     final labels = _stepLabels(context);
     return Scaffold(
       backgroundColor: Colors.white,
@@ -288,7 +317,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               children: [
                 if (_step == 1) _buildTicketsStep(),
                 if (_step == 2) _buildDetailsStep(),
-                if (_step == 3 && !_signedIn) _buildOtpStep(),
                 if (_step == _paymentStep) _buildPaymentStep(),
                 if (_error != null) ...[
                   const SizedBox(height: 12),
@@ -345,54 +373,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
     }
 
-    if (_step == 3 && !_signedIn) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ElevatedButton(
-              onPressed: _loading ? null : _verifyCheckoutOtp,
-              style: _primaryButtonStyle(enabled: !_loading),
-              child: Text(l10n.t('confirm_continue_payment')),
-            ),
-            const SizedBox(height: 10),
-            TextButton(
-              onPressed: _loading ? null : () => _sendCheckoutOtp(),
-              child: Text(
-                l10n.t('resend_code'),
-                style: const TextStyle(color: EkaadhColors.brand, fontWeight: FontWeight.w700),
-              ),
-            ),
-            TextButton(
-              onPressed: () => _goStep(2),
-              child: Text(
-                l10n.t('back_to_details'),
-                style: const TextStyle(color: EkaadhColors.muted, fontWeight: FontWeight.w700),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           ElevatedButton(
-            onPressed: _loading || _pay == null ? null : _payNow,
-            style: _primaryButtonStyle(enabled: _pay != null && !_loading),
+            onPressed: _loading ? null : _payNow,
+            style: _primaryButtonStyle(enabled: !_loading),
             child: Text(
-              _pay == null
-                  ? l10n.t('choose_payment_method')
-                  : '${l10n.t('pay_with')} \$${_total.toStringAsFixed(0)} ${l10n.t('with_method')} ${_pay == 'zaad' ? 'Zaad' : 'eDahab'}'.replaceAll(RegExp(r'\s+'), ' ').trim(),
+              '${l10n.t('pay_with')} \$${_total.toStringAsFixed(0)} ${l10n.t('with_method')} WaafiPay'.replaceAll(RegExp(r'\s+'), ' ').trim(),
             ),
           ),
           const SizedBox(height: 10),
           TextButton(
-            onPressed: () => _goStep(_signedIn ? 2 : 3),
+            onPressed: () => _goStep(2),
             child: Text(
               l10n.t('back'),
               style: const TextStyle(color: EkaadhColors.muted, fontWeight: FontWeight.w700),
@@ -533,7 +528,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(l10n.t('service_fee'), style: const TextStyle(color: EkaadhColors.muted, fontSize: 13)),
-                      Text('\$${_serviceFee.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                      Text('\$${_serviceFee.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                     ],
                   ),
                 ),
@@ -642,41 +637,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _buildOtpStep() {
-    final l10n = LocaleScope.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(l10n.t('confirm_phone'), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-        const SizedBox(height: 8),
-        Text(
-          '${l10n.t('enter_code_sent_to')} ${PhoneNumberField.fullNumber(_phone.text)}.',
-          style: const TextStyle(fontSize: 13, height: 1.45, color: EkaadhColors.muted),
-        ),
-        if (_otpHint != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            _otpHint!,
-            style: const TextStyle(color: EkaadhColors.brand, fontWeight: FontWeight.w700, fontSize: 13),
-          ),
-        ],
-        const SizedBox(height: 16),
-        TextField(
-          controller: _otp,
-          keyboardType: TextInputType.number,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 8, fontSize: 20),
-          decoration: EkaadhFields.decoration(hintText: '123456').copyWith(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildPaymentStep() {
     final l10n = LocaleScope.of(context);
-    final methodLabel = _pay == 'zaad' ? 'Zaad (Telesom)' : 'eDahab (Hormuud)';
+    const methodLabel = 'WaafiPay';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -691,14 +654,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           children: [
             Expanded(
               child: _PayCard(
-                id: 'zaad',
-                label: 'Zaad',
-                sub: l10n.t('mobile_money_telesom'),
-                abbr: 'Z',
-                bg: const Color(0xFFFFF3E0),
-                fg: const Color(0xFFE65100),
-                selected: _pay == 'zaad',
-                onTap: () => setState(() => _pay = 'zaad'),
+                id: 'waafipay',
+                label: 'WaafiPay',
+                sub: l10n.t('mobile_money_waafipay'),
+                selected: true,
+                leading: const OperatorLogos(height: 22),
+                onTap: () {},
               ),
             ),
             const SizedBox(width: 12),
@@ -706,19 +667,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: _PayCard(
                 id: 'edahab',
                 label: 'eDahab',
-                sub: l10n.t('mobile_money_hormuud'),
-                abbr: 'eD',
-                bg: const Color(0xFFE3F2FD),
-                fg: const Color(0xFF1565C0),
-                selected: _pay == 'edahab',
-                onTap: () => setState(() => _pay = 'edahab'),
+                sub: l10n.t('mobile_money_edahab'),
+                selected: false,
+                leading: Image.asset(
+                  'assets/images/somtel-logo.png',
+                  height: 28,
+                  fit: BoxFit.contain,
+                ),
+                onTap: () {
+                  EkaadhToast.error(context, message: l10n.t('edahab_unavailable'));
+                },
               ),
             ),
           ],
         ),
-        if (_pay != null) ...[
-          const SizedBox(height: 16),
-          Container(
+        const SizedBox(height: 16),
+        Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
@@ -738,7 +702,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   controller: _phone,
                   borderRadius: 16,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  readOnly: _signedIn,
+                  readOnly: _signedIn && !widget.event.paymentSandbox,
                 ),
                 const SizedBox(height: 14),
                 Container(
@@ -785,7 +749,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ],
             ),
           ),
-        ],
       ],
     );
   }
@@ -942,17 +905,15 @@ class _PayCard extends StatelessWidget {
     required this.id,
     required this.label,
     required this.sub,
-    required this.abbr,
-    required this.bg,
-    required this.fg,
     required this.selected,
     required this.onTap,
+    required this.leading,
   });
 
-  final String id, label, sub, abbr;
-  final Color bg, fg;
+  final String id, label, sub;
   final bool selected;
   final VoidCallback onTap;
+  final Widget leading;
 
   @override
   Widget build(BuildContext context) {
@@ -960,6 +921,7 @@ class _PayCard extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
       child: Container(
+        width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
@@ -974,13 +936,7 @@ class _PayCard extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(14)),
-                  alignment: Alignment.center,
-                  child: Text(abbr, style: TextStyle(fontWeight: FontWeight.w900, color: fg, fontSize: 15)),
-                ),
+                leading,
                 const SizedBox(height: 10),
                 Text(label, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
                 const SizedBox(height: 2),
@@ -1060,7 +1016,17 @@ class PaymentFailedScreen extends StatelessWidget {
               const SizedBox(height: 24),
               Text(l10n.t('payment_failed'), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
               const SizedBox(height: 10),
-              Text(message, textAlign: TextAlign.center, style: const TextStyle(color: EkaadhColors.muted, height: 1.65)),
+              Text(
+                UserFacingError.paymentMessage(message, t: l10n.t),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: EkaadhColors.dark, fontWeight: FontWeight.w600, height: 1.65),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                l10n.t('payment_failed_hint'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: EkaadhColors.muted, height: 1.5),
+              ),
               if (order != null) ...[
                 const SizedBox(height: 8),
                 Text(order!.orderNumber, style: const TextStyle(fontWeight: FontWeight.w700, color: EkaadhColors.soft)),
@@ -1080,6 +1046,127 @@ class PaymentFailedScreen extends StatelessWidget {
                   child: Text(l10n.t('try_again')),
                 ),
               ),
+              TextButton(
+                onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
+                child: Text(l10n.t('back_to_home'), style: const TextStyle(color: EkaadhColors.soft, fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class PaymentPendingScreen extends StatefulWidget {
+  const PaymentPendingScreen({
+    super.key,
+    required this.order,
+    required this.buyerPhone,
+  });
+
+  final OrderModel order;
+  final String buyerPhone;
+
+  @override
+  State<PaymentPendingScreen> createState() => _PaymentPendingScreenState();
+}
+
+class _PaymentPendingScreenState extends State<PaymentPendingScreen> {
+  late OrderModel _order;
+  bool _polling = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _order = widget.order;
+    _poll();
+  }
+
+  Future<void> _poll() async {
+    for (var i = 0; i < 24 && mounted; i++) {
+      await Future<void>.delayed(const Duration(seconds: 5));
+      if (!mounted) return;
+      try {
+        final fresh = await CheckoutService().fetchOrder(
+          _order.orderNumber,
+          phone: widget.buyerPhone,
+        );
+        if (!mounted) return;
+        if (fresh.status == 'paid') {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => OrderConfirmationScreen(order: fresh)),
+            (route) => route.isFirst,
+          );
+          return;
+        }
+        if (fresh.status == 'failed') {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => PaymentFailedScreen(
+                message: 'Payment was not confirmed. Please try again.',
+                order: fresh,
+              ),
+            ),
+          );
+          return;
+        }
+        setState(() => _order = fresh);
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _error = UserFacingError.message(e, t: LocaleScope.of(context).t));
+      }
+    }
+    if (mounted) setState(() => _polling = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = LocaleScope.of(context);
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const SizedBox(
+                width: 48,
+                height: 48,
+                child: CircularProgressIndicator(color: EkaadhColors.brand),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                l10n.t('payment_confirming'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                l10n.t('payment_confirming_hint'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: EkaadhColors.muted, height: 1.5),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _order.orderNumber,
+                style: const TextStyle(fontWeight: FontWeight.w700, color: EkaadhColors.soft),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: EkaadhColors.danger)),
+              ],
+              if (!_polling) ...[
+                const SizedBox(height: 24),
+                Text(
+                  l10n.t('payment_confirming_later'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: EkaadhColors.muted, height: 1.5),
+                ),
+              ],
+              const SizedBox(height: 28),
               TextButton(
                 onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
                 child: Text(l10n.t('back_to_home'), style: const TextStyle(color: EkaadhColors.soft, fontWeight: FontWeight.w700)),

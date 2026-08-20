@@ -32,13 +32,18 @@ class ApiConfig {
     return _productionApi;
   }
 
+  /// Local `php artisan serve` (bound to IPv4). Prefer 127.0.0.1 over localhost
+  /// so Windows does not try IPv6 (::1) and miss the listener.
+  static const _localArtisanApi = 'http://127.0.0.1:8000/api/v1';
+
   static String _webBaseUrl() {
     final page = Uri.base;
     final host = page.host;
-    // Chrome / localhost on this PC → still use production unless overridden,
-    // so local web testing hits ekaadh.com by default.
+    // Chrome / localhost on this PC → local Laravel, not production.
+    // Production CORS does not allow the Flutter web debug origin, which the
+    // app previously showed as “no internet”.
     if (host.isEmpty || host == 'localhost' || host == '127.0.0.1') {
-      return _productionApi;
+      return _localArtisanApi;
     }
     // If the Flutter web app is hosted on the same domain as the API (or LAN),
     // prefer that host’s Apache API path for non-production hosts.

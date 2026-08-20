@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
+import 'package:ekaadh_mobile/core/api_client.dart';
 import 'package:ekaadh_mobile/core/api_config.dart';
 import 'package:ekaadh_mobile/core/media_url.dart';
 import 'package:ekaadh_mobile/models/ticket_model.dart';
@@ -85,7 +85,7 @@ class CheckInService {
   };
 
   Future<List<StaffEventSummary>> events() async {
-    final response = await http.get(
+    final response = await ApiClient.get(
       Uri.parse('${ApiConfig.baseUrl}/staff/events'),
       headers: _headers,
     );
@@ -107,13 +107,18 @@ class CheckInService {
         .toList();
   }
 
-  Future<CheckInResult> scan({required String payload, int? eventId}) async {
-    final response = await http.post(
+  Future<CheckInResult> scan({
+    required String payload,
+    int? eventId,
+    bool manual = false,
+  }) async {
+    final response = await ApiClient.post(
       Uri.parse('${ApiConfig.baseUrl}/staff/check-in'),
       headers: _headers,
       body: jsonEncode({
         'payload': payload,
         if (eventId != null) 'event_id': eventId,
+        if (manual) 'manual': true,
       }),
     );
 
@@ -146,13 +151,10 @@ class CheckInService {
     );
   }
 
-  Map<String, dynamic> _decodeBody(http.Response response) {
-    if (response.body.isEmpty) return <String, dynamic>{};
-
+  Map<String, dynamic> _decodeBody(dynamic response) {
     try {
-      final decoded = jsonDecode(response.body);
-      return decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
-    } on FormatException {
+      return ApiClient.decode(response);
+    } catch (_) {
       return <String, dynamic>{};
     }
   }

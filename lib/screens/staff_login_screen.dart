@@ -37,17 +37,26 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> {
       _error = null;
     });
 
-    final error = await widget.auth.login(
-      login: _loginController.text.trim(),
-      password: _passwordController.text,
-    );
+    try {
+      final error = await widget.auth.login(
+        login: _loginController.text.trim(),
+        password: _passwordController.text,
+      );
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    if (error != null) {
+      if (error != null) {
+        setState(() {
+          _loading = false;
+          _error = error;
+        });
+        return;
+      }
+    } catch (_) {
+      if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = error;
+        _error = 'Could not reach Ekaadh. Please try again.';
       });
       return;
     }

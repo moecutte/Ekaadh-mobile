@@ -8,6 +8,7 @@ import 'package:ekaadh_mobile/screens/checkout_screen.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/services/event_service.dart';
 import 'package:ekaadh_mobile/widgets/design_network_image.dart';
+import 'package:ekaadh_mobile/core/user_facing_error.dart';
 
 class EventDetailScreen extends StatefulWidget {
   const EventDetailScreen({super.key, required this.slug, this.auth});
@@ -51,7 +52,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('${snap.error ?? l10n.t('event_not_found')}'),
+                  Text(UserFacingError.message(snap.error ?? l10n.t('event_not_found'), t: l10n.t)),
                   TextButton(onPressed: () => Navigator.pop(context), child: Text(l10n.t('go_back'))),
                 ],
               ),
@@ -190,21 +191,25 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       const SizedBox(width: 16),
                       Expanded(
                           child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => CheckoutScreen(event: e, auth: widget.auth),
-                              ),
-                            );
-                          },
+                          onPressed: e.isExpired
+                              ? null
+                              : () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => CheckoutScreen(event: e, auth: widget.auth),
+                                    ),
+                                  );
+                                },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: EkaadhColors.brand,
-                            foregroundColor: Colors.white,
+                            backgroundColor: e.isExpired ? const Color(0xFFE2E8F0) : EkaadhColors.brand,
+                            foregroundColor: e.isExpired ? const Color(0xFF64748B) : Colors.white,
+                            disabledBackgroundColor: const Color(0xFFE2E8F0),
+                            disabledForegroundColor: const Color(0xFF64748B),
                             padding: const EdgeInsets.symmetric(vertical: 17),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                             textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
                           ),
-                          child: Text(l10n.t('get_tickets')),
+                          child: Text(e.isExpired ? l10n.t('expired') : l10n.t('get_tickets')),
                         ),
                       ),
                     ],
