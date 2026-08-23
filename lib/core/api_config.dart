@@ -16,6 +16,10 @@ class ApiConfig {
   /// Uses Apache path on that host (port 80). For artisan on LAN use API_BASE_URL.
   static const _envHost = String.fromEnvironment('API_HOST');
 
+  /// Origin for images and share links when the API is a relative path
+  /// (Netlify proxy): `--dart-define=ASSET_ORIGIN=https://ekaadh.mahaysaa.com`
+  static const _envAssets = String.fromEnvironment('ASSET_ORIGIN');
+
   static String get baseUrl {
     if (_envBase.isNotEmpty) return _envBase.replaceAll(RegExp(r'/+$'), '');
 
@@ -45,10 +49,12 @@ class ApiConfig {
     if (host.isEmpty || host == 'localhost' || host == '127.0.0.1') {
       return _localArtisanApi;
     }
-    // If the Flutter web app is hosted on the same domain as the API (or LAN),
-    // prefer that host’s Apache API path for non-production hosts.
-    if (host == 'ekaadh.com' || host == 'www.ekaadh.com') {
-      return _productionApi;
+    // Same-origin Laravel API (`/api/v1`), including Coolify hosts.
+    if (host == 'ekaadh.com' ||
+        host == 'www.ekaadh.com' ||
+        host == 'ekaadh.mahaysaa.com') {
+      final scheme = page.scheme.isNotEmpty ? page.scheme : 'https';
+      return '$scheme://$host/api/v1';
     }
     final scheme = page.scheme.isNotEmpty ? page.scheme : 'http';
     return '$scheme://$host$_apiPath';
@@ -56,6 +62,9 @@ class ApiConfig {
 
   /// Laravel `APP_URL` origin (no `/api/v1`) — use for design images & uploads.
   static String get assetOrigin {
+    if (_envAssets.isNotEmpty) {
+      return _envAssets.replaceAll(RegExp(r'/+$'), '');
+    }
     final base = baseUrl;
     const suffix = '/api/v1';
     if (base.endsWith(suffix)) {

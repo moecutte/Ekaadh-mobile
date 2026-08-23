@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:ekaadh_mobile/core/locale_scope.dart';
 import 'package:ekaadh_mobile/core/theme.dart';
@@ -5,11 +7,11 @@ import 'package:ekaadh_mobile/models/private_event_model.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/services/private_event_service.dart';
 import 'package:ekaadh_mobile/screens/private_event_pay_screen.dart';
-import 'package:ekaadh_mobile/widgets/design_network_image.dart';
 import 'package:ekaadh_mobile/widgets/ekaadh_date_picker.dart';
 import 'package:ekaadh_mobile/widgets/ekaadh_wizard.dart';
-import 'package:ekaadh_mobile/widgets/invitation_theme_preview.dart';
+import 'package:ekaadh_mobile/widgets/invitation_html_preview.dart';
 import 'package:ekaadh_mobile/core/user_facing_error.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 class PrivateEventCreateScreen extends StatefulWidget {
   const PrivateEventCreateScreen({super.key, required this.auth});
@@ -49,6 +51,9 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
   bool _loadingMeta = true;
   bool _saving = false;
   String? _error;
+  final Map<int, String> _pickerHtml = {};
+  String? _liveHtml;
+  Timer? _previewDebounce;
 
   @override
   void initState() {
@@ -59,6 +64,7 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
 
   @override
   void dispose() {
+    _previewDebounce?.cancel();
     _pageController.dispose();
     _description.dispose();
     _venue.dispose();
@@ -79,6 +85,7 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
         _designId = '';
         _loadingMeta = false;
       });
+      _ensurePickerHtml();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -103,8 +110,10 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
     setState(() {
       _categoryId = v;
       _designId = '';
+      _liveHtml = null;
     });
     _clearFieldControllers();
+    _ensurePickerHtml();
   }
 
   void _clearFieldControllers() {
@@ -120,6 +129,7 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
     _seedFieldDefaults();
     _syncFieldControllers();
     _applyBasicsToFieldValues();
+    _queueLivePreview();
   }
 
   void _seedFieldDefaults() {
@@ -152,7 +162,7 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
         );
         controller.addListener(() {
           _fieldValues[field.fieldKey] = controller.text;
-          setState(() {});
+          _queueLivePreview();
         });
         _fieldControllers[field.fieldKey] = controller;
         _fieldValues[field.fieldKey] = controller.text;
@@ -252,6 +262,66 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
 
   String _fmtTime(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  Map<String, String> get _previewFields {
+    final out = <String, String>{..._fieldValues};
+    for (final entry in _fieldControllers.entries) {
+      out[entry.key] = entry.value.text;
+    }
+    return out;
+  }
+
+  Future<void> _ensurePickerHtml() async {
+    final designs = _meta?.designsForCategory(_categoryId) ?? [];
+    final pending = <int, Future<String>>{};
+    for (final design in designs) {
+      final id = design.invitationDesignId;
+      if (id == null || _pickerHtml.containsKey(id) || pending.containsKey(id)) {
+        continue;
+      }
+      pending[id] = _service.previewHtml(
+        invitationDesignId: id,
+        eventDate: _date != null ? _fmtDate(_date!) : null,
+        eventTime: _fmtTime(_time),
+        venue: _venue.text.trim(),
+        envelope: false,
+        compact: true,
+      );
+    }
+    if (pending.isEmpty) return;
+
+    final loaded = <int, String>{};
+    await Future.wait(pending.entries.map((entry) async {
+      try {
+        loaded[entry.key] = await entry.value;
+      } catch (_) {}
+    }));
+    if (!mounted || loaded.isEmpty) return;
+    setState(() => _pickerHtml.addAll(loaded));
+  }
+
+  void _queueLivePreview() {
+    _previewDebounce?.cancel();
+    _previewDebounce = Timer(const Duration(milliseconds: 350), _loadLivePreview);
+  }
+
+  Future<void> _loadLivePreview() async {
+    final id = _selectedDesign?.invitationDesignId;
+    if (id == null) return;
+    try {
+      final html = await _service.previewHtml(
+        invitationDesignId: id,
+        fields: _previewFields,
+        eventDate: _date != null ? _fmtDate(_date!) : null,
+        eventTime: _fmtTime(_time),
+        venue: _venue.text.trim(),
+        envelope: true,
+        autoOpen: true,
+      );
+      if (!mounted) return;
+      setState(() => _liveHtml = html);
+    } catch (_) {}
+  }
 
   String _fmtDateDisplay(DateTime d) {
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -372,6 +442,12 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
       _step = step;
       _error = null;
     });
+    if (step == 1) {
+      _ensurePickerHtml();
+    }
+    if (step == 2 || step == 3) {
+      _queueLivePreview();
+    }
     _pageController.animateToPage(
       step,
       duration: const Duration(milliseconds: 280),
@@ -705,7 +781,12 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
           ),
           child: EkaadhWizardCard(
             elevated: true,
-            child: InvitationThemePreview(design: design, fieldValues: _fieldValues),
+            child: InvitationDesignPreview(
+              design: design,
+              fieldValues: _previewFields,
+              html: _liveHtml,
+              includeQr: false,
+            ),
           ),
         ),
         if (design.buyerFields.isNotEmpty) ...[
@@ -761,7 +842,12 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
             title: l10n.t('live_preview'),
             child: EkaadhWizardCard(
               elevated: true,
-              child: InvitationThemePreview(design: design, fieldValues: _fieldValues),
+              child: InvitationDesignPreview(
+                design: design,
+                fieldValues: _previewFields,
+                html: _liveHtml,
+                includeQr: false,
+              ),
             ),
           ),
           const SizedBox(height: 22),
@@ -893,68 +979,104 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
   }
 
   Widget _designGrid(List<TicketDesignOption> designs) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-        childAspectRatio: 3 / 4,
-      ),
-      itemCount: designs.length,
-      itemBuilder: (context, index) => _designTile(designs[index]),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxW = constraints.maxWidth.isFinite && constraints.maxWidth > 0
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width - 40;
+        const gap = 10.0;
+        final columns = designs.length == 1
+            ? 1
+            : (maxW >= 520 ? 3 : 2);
+        final tileW = columns == 1
+            ? (maxW * 0.72).clamp(160.0, 280.0)
+            : (maxW - gap * (columns - 1)) / columns;
+        final tileH = tileW * 4 / 3;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (final design in designs)
+              SizedBox(
+                width: tileW,
+                height: tileH,
+                child: _designTile(design),
+              ),
+          ],
+        );
+      },
     );
   }
 
   Widget _designTile(TicketDesignOption d) {
     final selected = _designId == d.id;
-    final card = _parseColor(d.cardBg);
+    final html = d.invitationDesignId == null ? null : _pickerHtml[d.invitationDesignId];
 
-    return InkWell(
-      onTap: () => _selectDesign(d.id),
+    return Material(
+      color: Colors.white,
+      clipBehavior: Clip.antiAlias,
       borderRadius: BorderRadius.circular(14),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: selected ? EkaadhColors.brand : EkaadhColors.fieldBorder,
-            width: selected ? 2 : 1,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned.fill(
+            child: IgnorePointer(
+              child: InvitationDesignPreview(
+                design: d,
+                fieldValues: _previewFields,
+                html: html,
+                compact: true,
+                includeQr: false,
+              ),
+            ),
           ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: DesignNetworkImage(
-                    url: d.previewImageUrl,
-                    fallbackColor: card,
-                  ),
-                ),
-                if (d.isPremium)
-                  Container(
-                    color: const Color(0xFFFFFBEB),
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Text(
-                      '+\$${_meta!.premiumDesignSurcharge.toStringAsFixed(0)}',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Color(0xFFB45309),
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
+          Positioned.fill(
+            child: PointerInterceptor(
+              child: Material(
+                type: MaterialType.transparency,
+                child: InkWell(
+                  onTap: () => _selectDesign(d.id),
+                  borderRadius: BorderRadius.circular(14),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: selected ? EkaadhColors.brand : EkaadhColors.fieldBorder,
+                        width: selected ? 2 : 1,
                       ),
                     ),
+                    child: const SizedBox.expand(),
                   ),
-              ],
+                ),
+              ),
             ),
-            if (selected)
-              Positioned(
-                top: 6,
-                right: 6,
+          ),
+          if (d.isPremium)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                child: Container(
+                  color: const Color(0xFFFFFBEB),
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Text(
+                    '+\$${_meta!.premiumDesignSurcharge.toStringAsFixed(0)}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFFB45309),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (selected)
+            Positioned(
+              top: 6,
+              right: 6,
+              child: IgnorePointer(
                 child: Container(
                   padding: const EdgeInsets.all(4),
                   decoration: const BoxDecoration(
@@ -964,15 +1086,9 @@ class _PrivateEventCreateScreenState extends State<PrivateEventCreateScreen> {
                   child: const Icon(Icons.check_rounded, color: Colors.white, size: 14),
                 ),
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
-  }
-
-  Color _parseColor(String hex) {
-    var h = hex.replaceFirst('#', '');
-    if (h.length == 6) h = 'FF$h';
-    return Color(int.parse(h, radix: 16));
   }
 }

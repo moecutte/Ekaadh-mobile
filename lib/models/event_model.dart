@@ -80,6 +80,9 @@ class EventModel {
         .map((e) => TicketTypeModel.fromJson(e as Map<String, dynamic>))
         .toList();
 
+    final isFree = json['is_free'] as bool? ??
+        ((json['starting_price'] as num?)?.toDouble() ?? 0) == 0;
+
     return EventModel(
       id: json['id'] as int,
       title: json['title'] as String,
@@ -95,15 +98,14 @@ class EventModel {
       eventTimeLabel: json['event_time_label'] as String?,
       coverImage: MediaUrl.resolve(json['cover_image'] as String?),
       isFeatured: json['is_featured'] as bool? ?? false,
-      isFree: json['is_free'] as bool? ??
-          ((json['starting_price'] as num?)?.toDouble() ?? 0) == 0,
+      isFree: isFree,
       startingPrice: json['starting_price'] == null
           ? null
           : (json['starting_price'] as num).toDouble(),
       organizerName: organizer?['business_name'] as String?,
       ticketTypes: types,
       paymentSandbox: json['payment_sandbox'] as bool? ?? false,
-      serviceFee: (json['service_fee'] as num?)?.toDouble() ?? 1,
+      serviceFee: isFree ? 0 : ((json['service_fee'] as num?)?.toDouble() ?? 1),
     );
   }
 

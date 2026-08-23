@@ -51,6 +51,7 @@ class PrivateEventModel {
   final int remaining;
   final String? ticketDesign;
   final TicketDesignOption? design;
+  final Map<String, String> invitationFieldValues;
   final List<PrivateEventTicketType> ticketTypes;
   final Map<String, dynamic>? pendingOrder;
   final bool paymentSandbox;
@@ -75,6 +76,7 @@ class PrivateEventModel {
     required this.remaining,
     required this.ticketDesign,
     required this.design,
+    this.invitationFieldValues = const {},
     required this.ticketTypes,
     required this.pendingOrder,
     this.paymentSandbox = false,
@@ -123,8 +125,9 @@ class PrivateEventModel {
       remaining: json['remaining'] as int? ?? 0,
       ticketDesign: json['ticket_design'] as String?,
       design: designJson == null ? null : TicketDesignOption.fromJson(designJson),
+      invitationFieldValues: _stringMap(json['invitation_field_values']),
       ticketTypes: types,
-      pendingOrder: json['pending_order'] as Map<String, dynamic>?,
+      pendingOrder: _pendingOrderMap(json['pending_order']),
       paymentSandbox: json['payment_sandbox'] as bool? ?? false,
       testWallets: _parseTestWallets(json),
     );
@@ -145,6 +148,22 @@ class PrivateEventModel {
       ];
     }
     return const [];
+  }
+
+  static Map<String, dynamic>? _pendingOrderMap(dynamic raw) {
+    if (raw is! Map) return null;
+    final map = Map<String, dynamic>.from(raw);
+    final nested = map['data'];
+    if (map['id'] == null && nested is Map) {
+      return Map<String, dynamic>.from(nested);
+    }
+    if (map['id'] == null && map['order_number'] == null) return null;
+    return map;
+  }
+
+  static Map<String, String> _stringMap(dynamic raw) {
+    if (raw is! Map) return const {};
+    return raw.map((key, value) => MapEntry(key.toString(), value?.toString() ?? ''));
   }
 }
 

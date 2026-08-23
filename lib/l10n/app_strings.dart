@@ -253,6 +253,7 @@ class AppStrings {
     'continue_to_details': 'Continue to Your Details',
     'select_at_least_1': 'Select at least 1 ticket',
     'continue_to_payment': 'Continue to Payment',
+    'claim_free_tickets': 'Get free tickets',
     'confirm_continue_payment': 'Confirm & continue to payment',
     'back_to_details': 'Back to Details',
     'choose_payment_method': 'Choose a payment method',
@@ -299,12 +300,15 @@ class AppStrings {
 
     // Order confirmation
     'payment_successful': 'Payment Successful!',
+    'tickets_confirmed': 'Tickets confirmed!',
     'order_ref': 'Order',
     'your_tickets': 'Your tickets',
     'your_tickets_upper': 'YOUR TICKETS',
     'tap_full_ticket': 'Tap for full ticket',
     'ticket_delivery_note':
         'A payment confirmation SMS was sent. Find your tickets anytime under My Tickets, and by email when available.',
+    'ticket_delivery_note_free':
+        'Your free tickets are confirmed. Find them anytime under My Tickets, and by email when available.',
     'view_my_tickets': 'View My Tickets',
 
     // My tickets
@@ -707,6 +711,7 @@ class AppStrings {
     'continue_to_details': 'U gudub Faahfaahintaada',
     'select_at_least_1': 'Ugu yaraan dooro 1 tigidh',
     'continue_to_payment': 'U gudub Bixinta',
+    'claim_free_tickets': 'Hel tigidho bilaash ah',
     'confirm_continue_payment': 'Xaqiiji oo u gudub bixinta',
     'back_to_details': 'Ku noqo Faahfaahinta',
     'choose_payment_method': 'Dooro habka bixinta',
@@ -752,12 +757,15 @@ class AppStrings {
     'back_to_home': 'Ku noqo Hoyga',
 
     'payment_successful': 'Bixinta Waa Guulaysatay!',
+    'tickets_confirmed': 'Tigidhada waa la xaqiijiyay!',
     'order_ref': 'Dalabka',
     'your_tickets': 'Tigidhadaada',
     'your_tickets_upper': 'TIGIDHADAADA',
     'tap_full_ticket': 'Taabo tigidhka buuxa',
     'ticket_delivery_note':
         'SMS xaqiijin bixin ayaa la diray. Hel tigidhadaada mar kasta My Tickets, iyo email marka la heli karo.',
+    'ticket_delivery_note_free':
+        'Tigidhadaada bilaashka ah waa la xaqiijiyay. Ka hel mar kasta My Tickets, iyo email marka la heli karo.',
     'view_my_tickets': 'Eeg Tigidhadayda',
 
     'booked_events_desc': 'Tigidhada aad iibsatay ee dhacdooyinka dadweynaha',

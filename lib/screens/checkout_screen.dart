@@ -51,11 +51,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   List<String> _stepLabels(BuildContext context) {
     final l10n = LocaleScope.of(context);
+    if (_isFree) {
+      return [l10n.t('step_select_tickets'), l10n.t('step_your_details')];
+    }
     return [l10n.t('step_select_tickets'), l10n.t('step_your_details'), l10n.t('step_payment')];
   }
 
+  bool get _isFree => widget.event.isFree;
   int get _paymentStep => 3;
-  int get _maxStep => _paymentStep;
+  int get _maxStep => _isFree ? 2 : _paymentStep;
 
   @override
   void initState() {
@@ -92,7 +96,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return sum;
   }
 
-  double get _serviceFee => widget.event.serviceFee;
+  double get _serviceFee => _isFree ? 0 : widget.event.serviceFee;
 
   double get _total => _ticketCount > 0 ? _subtotal + _serviceFee : 0;
 
@@ -122,6 +126,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
     if (_signedIn) {
+      if (_isFree) {
+        await _payNow();
+        return;
+      }
       _goStep(3);
       return;
     }
@@ -159,9 +167,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       setState(() {
         _otpToken = verified!.otpToken;
         _otpPhone = PhoneNumberField.fullNumber(_phone.text);
-        _step = _paymentStep;
         _error = null;
       });
+      if (_isFree) {
+        await _payNow();
+        return;
+      }
+      setState(() => _step = _paymentStep);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -191,7 +203,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
 
     String? walletPin;
-    if (widget.event.paymentSandbox) {
+    if (!_isFree && widget.event.paymentSandbox) {
       walletPin = await showWalletPinDialog(context);
       if (!mounted || walletPin == null || walletPin.isEmpty) return;
     }
@@ -365,7 +377,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: ElevatedButton(
                 onPressed: _loading ? null : _continueFromDetails,
                 style: _primaryButtonStyle(enabled: !_loading),
-                child: Text(_signedIn ? l10n.t('continue_to_payment') : l10n.t('continue')),
+                child: Text(
+                  _signedIn
+                      ? (_isFree ? l10n.t('claim_free_tickets') : l10n.t('continue_to_payment'))
+                      : l10n.t('continue'),
+                ),
               ),
             ),
           ],
@@ -521,7 +537,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               }),
               const Divider(height: 1, color: Color(0xFFF0F4F2)),
               const SizedBox(height: 14),
-              if (_ticketCount > 0)
+              if (_ticketCount > 0 && !_isFree)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Row(

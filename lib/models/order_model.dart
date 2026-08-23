@@ -21,12 +21,12 @@ class OrderTicket {
 
   factory OrderTicket.fromJson(Map<String, dynamic> json) {
     return OrderTicket(
-      id: json['id'] as int,
-      ticketCode: json['ticket_code'] as String,
+      id: _asInt(json['id']),
+      ticketCode: json['ticket_code']?.toString() ?? '',
       holderName: json['holder_name'] as String?,
-      ticketTypeName: json['ticket_type_name'] as String,
-      status: json['status'] as String,
-      qrPayload: json['qr_payload'] as String? ?? json['ticket_code'] as String,
+      ticketTypeName: json['ticket_type_name']?.toString() ?? '',
+      status: json['status']?.toString() ?? '',
+      qrPayload: json['qr_payload']?.toString() ?? json['ticket_code']?.toString() ?? '',
       publicUrl: json['public_url'] as String?,
     );
   }
@@ -49,11 +49,11 @@ class OrderItemLine {
 
   factory OrderItemLine.fromJson(Map<String, dynamic> json) {
     return OrderItemLine(
-      id: json['id'] as int,
+      id: _asInt(json['id']),
       ticketTypeName: json['ticket_type_name'] as String?,
-      quantity: json['quantity'] as int,
-      unitPrice: (json['unit_price'] as num).toDouble(),
-      subtotal: (json['subtotal'] as num).toDouble(),
+      quantity: _asInt(json['quantity']),
+      unitPrice: _asDouble(json['unit_price']),
+      subtotal: _asDouble(json['subtotal']),
     );
   }
 }
@@ -74,6 +74,7 @@ class OrderModel {
   final String? eventDateLabel;
   final String? eventTimeLabel;
   final String? venue;
+  final bool isFree;
   final List<OrderItemLine> items;
   final List<OrderTicket> tickets;
 
@@ -93,34 +94,57 @@ class OrderModel {
     required this.eventDateLabel,
     required this.eventTimeLabel,
     required this.venue,
+    required this.isFree,
     required this.items,
     required this.tickets,
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
+    final nested = json['data'];
+    if (json['id'] == null && nested is Map<String, dynamic>) {
+      json = nested;
+    }
     final event = json['event'] as Map<String, dynamic>?;
     return OrderModel(
-      id: json['id'] as int,
-      orderNumber: json['order_number'] as String,
-      status: json['status'] as String,
-      buyerName: json['buyer_name'] as String,
+      id: _asInt(json['id']),
+      orderNumber: json['order_number']?.toString() ?? '',
+      status: json['status']?.toString() ?? 'pending',
+      buyerName: (json['buyer_name'] as String?)?.trim().isNotEmpty == true
+          ? json['buyer_name'] as String
+          : 'Customer',
       buyerEmail: json['buyer_email'] as String?,
-      buyerPhone: json['buyer_phone'] as String,
-      subtotal: (json['subtotal'] as num).toDouble(),
-      serviceFee: (json['service_fee'] as num).toDouble(),
-      totalAmount: (json['total_amount'] as num).toDouble(),
+      buyerPhone: json['buyer_phone']?.toString() ?? '',
+      subtotal: _asDouble(json['subtotal']),
+      serviceFee: _asDouble(json['service_fee']),
+      totalAmount: _asDouble(json['total_amount']),
       paymentMethod: json['payment_method'] as String?,
       eventTitle: event?['title'] as String?,
       eventCover: MediaUrl.resolve(event?['cover_image'] as String?),
       eventDateLabel: event?['event_date_label'] as String?,
       eventTimeLabel: event?['event_time_label'] as String?,
       venue: event?['venue'] as String?,
+      isFree: event?['is_free'] as bool? ??
+          (_asDouble(json['total_amount']) <= 0 && json['payment_method'] == null),
       items: (json['items'] as List<dynamic>? ?? [])
-          .map((e) => OrderItemLine.fromJson(e as Map<String, dynamic>))
+          .map((e) => OrderItemLine.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList(),
       tickets: (json['tickets'] as List<dynamic>? ?? [])
-          .map((e) => OrderTicket.fromJson(e as Map<String, dynamic>))
+          .map((e) => OrderTicket.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList(),
     );
   }
+}
+
+int _asInt(dynamic value, [int fallback = 0]) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? fallback;
+  return fallback;
+}
+
+double _asDouble(dynamic value, [double fallback = 0]) {
+  if (value is double) return value;
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value) ?? fallback;
+  return fallback;
 }

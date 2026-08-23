@@ -12,6 +12,7 @@ class DesignNetworkImage extends StatelessWidget {
     this.fallbackColor = const Color(0xFFF1F5F9),
     this.width,
     this.height,
+    this.allowHtmlElement = true,
   });
 
   final String? url;
@@ -19,6 +20,10 @@ class DesignNetworkImage extends StatelessWidget {
   final Color fallbackColor;
   final double? width;
   final double? height;
+
+  /// When false, decode in the Flutter canvas so parent taps are not stolen
+  /// by an HTML `<img>` platform view (picker tiles).
+  final bool allowHtmlElement;
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +43,9 @@ class DesignNetworkImage extends StatelessWidget {
       // Chrome/web: HTML img can display cross-origin images without CORS.
       // Default canvas decode requires Access-Control-Allow-Origin.
       webHtmlElementStrategy:
-          kIsWeb ? WebHtmlElementStrategy.prefer : WebHtmlElementStrategy.never,
+          (kIsWeb && allowHtmlElement)
+              ? WebHtmlElementStrategy.prefer
+              : WebHtmlElementStrategy.never,
       loadingBuilder: (context, child, progress) {
         if (progress == null) return child;
         return ColoredBox(

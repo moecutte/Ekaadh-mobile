@@ -28,6 +28,7 @@ class PhoneNumberField extends StatelessWidget {
     if (digits.startsWith('252')) {
       digits = digits.substring(3);
     }
+    digits = digits.replaceFirst(RegExp(r'^0+'), '');
     return digits;
   }
 

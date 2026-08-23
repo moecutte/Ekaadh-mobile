@@ -52,4 +52,4 @@ Colors match the web app brand (`#323891`) — see `lib/core/theme.dart`.
 
 ## Staff check-in
 
-Login screen → **Staff check-in portal**. Use a staff account created in Admin (never seed demo users on production).
+Login screen → **Staff check-in portal**. Seeded staff login is `staff@ekaadh.com` / `password`.

@@ -11,6 +11,7 @@ import 'package:ekaadh_mobile/widgets/operator_logos.dart';
 import 'package:ekaadh_mobile/widgets/phone_number_field.dart';
 import 'package:ekaadh_mobile/widgets/wallet_pin_dialog.dart';
 import 'package:ekaadh_mobile/widgets/ekaadh_toast.dart';
+import 'package:ekaadh_mobile/widgets/invitation_html_preview.dart';
 
 class PrivateEventPayScreen extends StatefulWidget {
   const PrivateEventPayScreen({
@@ -37,6 +38,7 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
   bool _paying = false;
   String? _error;
   bool _payFailed = false;
+  String? _previewHtml;
   final TextEditingController _chargePhone = TextEditingController();
 
   @override
@@ -74,14 +76,18 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
         return;
       }
       OrderModel? order = _order;
-      if (event.pendingOrder != null) {
-        order = OrderModel.fromJson(event.pendingOrder!);
+      final pending = event.pendingOrder;
+      if (pending != null) {
+        try {
+          order = OrderModel.fromJson(pending);
+        } catch (_) {}
       }
       setState(() {
         _event = event;
         _order = order;
         _loading = false;
       });
+      _loadPreview();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -89,6 +95,25 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
         _loading = false;
       });
     }
+  }
+
+  Future<void> _loadPreview() async {
+    final event = _event;
+    final id = event?.design?.invitationDesignId;
+    if (event == null || id == null) return;
+    try {
+      final html = await _service.previewHtml(
+        invitationDesignId: id,
+        fields: event.invitationFieldValues,
+        eventDate: event.eventDate,
+        eventTime: event.eventTime,
+        venue: event.venue,
+        envelope: true,
+        autoOpen: true,
+      );
+      if (!mounted) return;
+      setState(() => _previewHtml = html);
+    } catch (_) {}
   }
 
   Future<void> _pay() async {
@@ -163,9 +188,23 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
           ? const Center(child: CircularProgressIndicator(color: EkaadhColors.brand))
           : order == null
               ? Center(
-                  child: Text(
-                    _error ?? l10n.t('no_pending_payment'),
-                    style: const TextStyle(color: EkaadhColors.danger),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _error ?? l10n.t('no_pending_payment'),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: EkaadhColors.danger, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 16),
+                        TextButton(
+                          onPressed: _loading ? null : _load,
+                          child: Text(l10n.t('try_again')),
+                        ),
+                      ],
+                    ),
                   ),
                 )
               : ListView(
@@ -177,6 +216,15 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
                         style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
                       ),
                     const SizedBox(height: 16),
+                    if (_event?.design != null) ...[
+                      InvitationDesignPreview(
+                        design: _event!.design!,
+                        fieldValues: _event!.invitationFieldValues,
+                        html: _previewHtml,
+                        includeQr: false,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(

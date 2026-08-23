@@ -33,7 +33,10 @@ class OrderConfirmationScreen extends StatelessWidget {
                     child: const Icon(Icons.check, color: Colors.white, size: 40),
                   ),
                   const SizedBox(height: 12),
-                  Text(l10n.t('payment_successful'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+                  Text(
+                    l10n.t(order.isFree ? 'tickets_confirmed' : 'payment_successful'),
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+                  ),
                   Text('${l10n.t('order_ref')} ${order.orderNumber}', style: const TextStyle(color: EkaadhColors.soft, fontSize: 13)),
                 ],
               ),
@@ -129,7 +132,7 @@ class OrderConfirmationScreen extends StatelessWidget {
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(color: EkaadhColors.brandLight, borderRadius: BorderRadius.circular(18)),
                     child: Text(
-                      l10n.t('ticket_delivery_note'),
+                      l10n.t(order.isFree ? 'ticket_delivery_note_free' : 'ticket_delivery_note'),
                       style: const TextStyle(color: EkaadhColors.muted, fontSize: 13, height: 1.5),
                     ),
                   ),

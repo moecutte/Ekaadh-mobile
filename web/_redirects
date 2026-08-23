@@ -1,0 +1,4 @@
+/api/*      https://ekaadh.mahaysaa.com/api/:splat      200
+/storage/*  https://ekaadh.mahaysaa.com/storage/:splat  200
+/images/*   https://ekaadh.mahaysaa.com/images/:splat   200
+/*          /index.html                                 200
