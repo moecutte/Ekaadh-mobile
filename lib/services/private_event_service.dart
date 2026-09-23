@@ -163,6 +163,10 @@ class PrivateEventService {
     }
     final order = OrderModel.fromJson(orderJson);
     final event = PrivateEventModel.fromJson(eventJson);
+    final redirect = order.cardRedirectUrl;
+    if (order.status == 'pending' && redirect != null && redirect.isNotEmpty) {
+      return (event: event, order: order);
+    }
     if (order.status != 'paid') {
       throw Exception(body['message']?.toString() ?? 'Payment could not be completed.');
     }

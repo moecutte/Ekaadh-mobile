@@ -49,6 +49,7 @@ class EventModel {
   final String? organizerName;
   final List<TicketTypeModel> ticketTypes;
   final bool paymentSandbox;
+  final bool cardPaymentsEnabled;
   final double serviceFee;
 
   const EventModel({
@@ -71,6 +72,7 @@ class EventModel {
     required this.organizerName,
     required this.ticketTypes,
     this.paymentSandbox = false,
+    this.cardPaymentsEnabled = false,
     this.serviceFee = 1,
   });
 
@@ -105,6 +107,7 @@ class EventModel {
       organizerName: organizer?['business_name'] as String?,
       ticketTypes: types,
       paymentSandbox: json['payment_sandbox'] as bool? ?? false,
+      cardPaymentsEnabled: json['card_payments_enabled'] as bool? ?? false,
       serviceFee: isFree ? 0 : ((json['service_fee'] as num?)?.toDouble() ?? 1),
     );
   }

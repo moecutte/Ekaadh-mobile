@@ -1,4 +1,4 @@
-package com.ekaadh.ekaadh_mobile
+package com.ekaadh.app
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -121,7 +121,7 @@ class _MyTicketsTabState extends State<MyTicketsTab> {
       _lookupError = null;
     });
     try {
-      final sent = await OtpService().send(
+      await OtpService().send(
         phone: PhoneNumberField.fullNumber(_phoneController.text),
         purpose: OtpService.purposeFindTickets,
       );
@@ -134,9 +134,6 @@ class _MyTicketsTabState extends State<MyTicketsTab> {
             phone: PhoneNumberField.fullNumber(_phoneController.text),
             purpose: OtpService.purposeFindTickets,
             alreadySent: true,
-            debugHint: sent.debugCode != null
-                ? '${l10n.t('testing_code')}: ${sent.debugCode}'
-                : null,
           ),
         ),
       );

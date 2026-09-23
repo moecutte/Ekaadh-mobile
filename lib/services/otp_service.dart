@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:ekaadh_mobile/core/api_client.dart';
 import 'package:ekaadh_mobile/core/api_config.dart';
 import 'package:ekaadh_mobile/models/ticket_model.dart';
@@ -9,14 +8,12 @@ class OtpResult {
   const OtpResult({
     required this.phone,
     required this.message,
-    this.debugCode,
     this.otpToken,
     this.tickets = const [],
   });
 
   final String phone;
   final String message;
-  final String? debugCode;
   final String? otpToken;
   final List<TicketModel> tickets;
 }
@@ -38,7 +35,6 @@ class OtpService {
     return OtpResult(
       phone: body['phone']?.toString() ?? phone,
       message: body['message']?.toString() ?? 'Code sent.',
-      debugCode: kDebugMode ? body['debug_code']?.toString() : null,
     );
   }
 

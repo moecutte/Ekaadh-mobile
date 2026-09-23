@@ -77,6 +77,7 @@ class OrderModel {
   final bool isFree;
   final List<OrderItemLine> items;
   final List<OrderTicket> tickets;
+  final String? cardRedirectUrl;
 
   const OrderModel({
     required this.id,
@@ -97,6 +98,7 @@ class OrderModel {
     required this.isFree,
     required this.items,
     required this.tickets,
+    this.cardRedirectUrl,
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
@@ -131,6 +133,7 @@ class OrderModel {
       tickets: (json['tickets'] as List<dynamic>? ?? [])
           .map((e) => OrderTicket.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList(),
+      cardRedirectUrl: json['card_redirect_url']?.toString(),
     );
   }
 }

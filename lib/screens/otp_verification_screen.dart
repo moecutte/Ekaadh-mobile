@@ -14,13 +14,11 @@ class OtpVerificationScreen extends StatefulWidget {
     super.key,
     required this.phone,
     required this.purpose,
-    this.debugHint,
     this.alreadySent = false,
   });
 
   final String phone;
   final String purpose;
-  final String? debugHint;
   final bool alreadySent;
 
   @override
@@ -32,14 +30,12 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   final _focus = FocusNode();
   bool _loading = false;
   bool _sending = false;
-  String? _debugHint;
   int _resendIn = 0;
   Timer? _resendTimer;
 
   @override
   void initState() {
     super.initState();
-    _debugHint = widget.debugHint;
     _code.addListener(() => setState(() {}));
     if (widget.alreadySent) {
       _startResendCooldown();
@@ -77,18 +73,12 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     if (_sending || _resendIn > 0) return;
     setState(() => _sending = true);
     try {
-      final result = await OtpService().send(
+      await OtpService().send(
         phone: widget.phone,
         purpose: widget.purpose,
       );
       if (!mounted) return;
-      final l10n = LocaleScope.of(context);
-      setState(() {
-        _sending = false;
-        _debugHint = result.debugCode != null
-            ? '${l10n.t('testing_code')}: ${result.debugCode}'
-            : null;
-      });
+      setState(() => _sending = false);
       _startResendCooldown();
     } catch (e) {
       if (!mounted) return;
@@ -203,18 +193,6 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                       enabled: !_loading,
                       onCompleted: (_) => _verify(),
                     ),
-                    if (_debugHint != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        _debugHint!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: EkaadhColors.brand,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
                     const SizedBox(height: 28),
                     Text(
                       l10n.t('dont_receive_otp'),

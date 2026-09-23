@@ -6,10 +6,12 @@ import 'package:ekaadh_mobile/models/event_model.dart';
 import 'package:ekaadh_mobile/models/order_model.dart';
 import 'package:ekaadh_mobile/screens/order_confirmation_screen.dart';
 import 'package:ekaadh_mobile/screens/otp_verification_screen.dart';
+import 'package:ekaadh_mobile/screens/card_payment_webview_screen.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/services/checkout_service.dart';
 import 'package:ekaadh_mobile/services/otp_service.dart';
 import 'package:ekaadh_mobile/widgets/design_network_image.dart';
+import 'package:ekaadh_mobile/widgets/card_network_logos.dart';
 import 'package:ekaadh_mobile/widgets/operator_logos.dart';
 import 'package:ekaadh_mobile/widgets/phone_number_field.dart';
 import 'package:ekaadh_mobile/widgets/wallet_pin_dialog.dart';
@@ -137,13 +139,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _confirmPhoneThenPay() async {
-    final l10n = LocaleScope.of(context);
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final sent = await OtpService().send(
+      await OtpService().send(
         phone: PhoneNumberField.fullNumber(_phone.text),
         purpose: OtpService.purposeCheckout,
       );
@@ -156,9 +157,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             phone: PhoneNumberField.fullNumber(_phone.text),
             purpose: OtpService.purposeCheckout,
             alreadySent: true,
-            debugHint: sent.debugCode != null
-                ? '${l10n.t('testing_code')}: ${sent.debugCode}'
-                : null,
           ),
         ),
       );
@@ -203,7 +201,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
 
     String? walletPin;
-    if (!_isFree && widget.event.paymentSandbox) {
+    if (!_isFree && _pay == 'waafipay' && widget.event.paymentSandbox) {
       walletPin = await showWalletPinDialog(context);
       if (!mounted || walletPin == null || walletPin.isEmpty) return;
     }
@@ -241,6 +239,39 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       if (!mounted) return;
       Navigator.of(context).pop();
+      final cardUrl = order.cardRedirectUrl;
+      if (cardUrl != null && cardUrl.isNotEmpty) {
+        final ok = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => CardPaymentWebViewScreen(url: cardUrl),
+          ),
+        );
+        if (!mounted) return;
+        if (ok == true) {
+          // Poll briefly for confirmation after HPP success callback.
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (_) => PaymentPendingScreen(
+                order: order,
+                buyerPhone: PhoneNumberField.fullNumber(_phone.text),
+              ),
+            ),
+            (route) => route.isFirst,
+          );
+          return;
+        }
+        if (ok == false) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => PaymentFailedScreen(
+                message: l10n.t('payment_failed_hint'),
+                order: order,
+              ),
+            ),
+          );
+          return;
+        }
+      }
       if (order.status == 'pending') {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
@@ -655,7 +686,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _buildPaymentStep() {
     final l10n = LocaleScope.of(context);
-    const methodLabel = 'WaafiPay';
+    final methodLabel = _pay == 'waafipay_card' ? l10n.t('card_visa_mastercard') : 'WaafiPay';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -673,30 +704,61 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 id: 'waafipay',
                 label: 'WaafiPay',
                 sub: l10n.t('mobile_money_waafipay'),
-                selected: true,
+                selected: _pay == 'waafipay',
                 leading: const OperatorLogos(height: 22),
-                onTap: () {},
+                onTap: () => setState(() => _pay = 'waafipay'),
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _PayCard(
-                id: 'edahab',
-                label: 'eDahab',
-                sub: l10n.t('mobile_money_edahab'),
-                selected: false,
-                leading: Image.asset(
-                  'assets/images/somtel-logo.png',
-                  height: 28,
-                  fit: BoxFit.contain,
+            if (widget.event.cardPaymentsEnabled) ...[
+              const SizedBox(width: 12),
+              Expanded(
+                child: _PayCard(
+                  id: 'waafipay_card',
+                  label: l10n.t('card_visa_mastercard'),
+                  sub: l10n.t('card_payment_hint'),
+                  selected: _pay == 'waafipay_card',
+                  leading: const CardNetworkLogos(height: 22),
+                  onTap: () => setState(() => _pay = 'waafipay_card'),
                 ),
-                onTap: () {
-                  EkaadhToast.error(context, message: l10n.t('edahab_unavailable'));
-                },
               ),
-            ),
+            ] else ...[
+              const SizedBox(width: 12),
+              Expanded(
+                child: _PayCard(
+                  id: 'edahab',
+                  label: 'eDahab',
+                  sub: l10n.t('mobile_money_edahab'),
+                  selected: false,
+                  leading: Image.asset(
+                    'assets/images/somtel-logo.png',
+                    height: 28,
+                    fit: BoxFit.contain,
+                  ),
+                  onTap: () {
+                    EkaadhToast.error(context, message: l10n.t('edahab_unavailable'));
+                  },
+                ),
+              ),
+            ],
           ],
         ),
+        if (widget.event.cardPaymentsEnabled) ...[
+          const SizedBox(height: 12),
+          _PayCard(
+            id: 'edahab',
+            label: 'eDahab',
+            sub: l10n.t('mobile_money_edahab'),
+            selected: false,
+            leading: Image.asset(
+              'assets/images/somtel-logo.png',
+              height: 28,
+              fit: BoxFit.contain,
+            ),
+            onTap: () {
+              EkaadhToast.error(context, message: l10n.t('edahab_unavailable'));
+            },
+          ),
+        ],
         const SizedBox(height: 16),
         Container(
             padding: const EdgeInsets.all(18),
@@ -707,20 +769,28 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  _signedIn
-                      ? '${l10n.t('charge_on_account_phone')} $methodLabel ${l10n.t('on_your_account_phone')}'
-                      : '${l10n.t('enter_number_to_charge')} $methodLabel ${l10n.t('number_to_charge')}',
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 10),
-                PhoneNumberField(
-                  controller: _phone,
-                  borderRadius: 16,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  readOnly: _signedIn && !widget.event.paymentSandbox,
-                ),
-                const SizedBox(height: 14),
+                if (_pay == 'waafipay') ...[
+                  Text(
+                    _signedIn
+                        ? '${l10n.t('charge_on_account_phone')} $methodLabel ${l10n.t('on_your_account_phone')}'
+                        : '${l10n.t('enter_number_to_charge')} $methodLabel ${l10n.t('number_to_charge')}',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 10),
+                  PhoneNumberField(
+                    controller: _phone,
+                    borderRadius: 16,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    readOnly: _signedIn && !widget.event.paymentSandbox,
+                  ),
+                  const SizedBox(height: 14),
+                ] else if (_pay == 'waafipay_card') ...[
+                  Text(
+                    l10n.t('card_payment_hint'),
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 14),
+                ],
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -998,7 +1068,11 @@ class _ProcessingDialog extends StatelessWidget {
             const SizedBox(height: 20),
             Text(l10n.t('processing_payment'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
             const SizedBox(height: 6),
-            Text(l10n.t('please_wait'), style: const TextStyle(color: EkaadhColors.muted)),
+            Text(
+              l10n.t('waiting_phone_pin'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: EkaadhColors.muted, height: 1.4),
+            ),
           ],
         ),
       ),

@@ -5,8 +5,10 @@ import 'package:ekaadh_mobile/models/order_model.dart';
 import 'package:ekaadh_mobile/models/private_event_model.dart';
 import 'package:ekaadh_mobile/services/auth_service.dart';
 import 'package:ekaadh_mobile/services/private_event_service.dart';
+import 'package:ekaadh_mobile/screens/card_payment_webview_screen.dart';
 import 'package:ekaadh_mobile/screens/private_event_detail_screen.dart';
 import 'package:ekaadh_mobile/core/user_facing_error.dart';
+import 'package:ekaadh_mobile/widgets/card_network_logos.dart';
 import 'package:ekaadh_mobile/widgets/operator_logos.dart';
 import 'package:ekaadh_mobile/widgets/phone_number_field.dart';
 import 'package:ekaadh_mobile/widgets/wallet_pin_dialog.dart';
@@ -119,8 +121,9 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
   Future<void> _pay() async {
     final l10n = LocaleScope.of(context);
     final sandbox = _event?.paymentSandbox == true;
+    final isCard = _method == 'waafipay_card';
     String? chargePhone;
-    if (sandbox) {
+    if (sandbox && !isCard) {
       if (!PhoneNumberField.hasLocalNumber(_chargePhone.text)) {
         setState(() => _error = l10n.t('sandbox_charge_phone_required'));
         return;
@@ -129,7 +132,7 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
     }
 
     String? walletPin;
-    if (sandbox) {
+    if (sandbox && !isCard) {
       walletPin = await showWalletPinDialog(context);
       if (!mounted || walletPin == null || walletPin.isEmpty) return;
     }
@@ -148,6 +151,48 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
         buyerPhone: chargePhone,
       );
       if (!mounted) return;
+
+      final redirect = result.order.cardRedirectUrl;
+      if (redirect != null && redirect.isNotEmpty) {
+        final ok = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(builder: (_) => CardPaymentWebViewScreen(url: redirect)),
+        );
+        if (!mounted) return;
+        if (ok != true) {
+          setState(() {
+            _paying = false;
+            _payFailed = true;
+            _error = l10n.t('payment_failed_hint');
+          });
+          return;
+        }
+        // After HPP success the web callback marks the order paid; reload event.
+        await _load();
+        if (!mounted) return;
+        if (_event?.isPaid == true) {
+          await EkaadhToast.success(
+            context,
+            message: LocaleScope.of(context).t('payment_successful_short'),
+          );
+          if (!mounted) return;
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (_) => PrivateEventDetailScreen(
+                auth: widget.auth,
+                eventId: widget.eventId,
+              ),
+            ),
+            (route) => route.isFirst,
+          );
+          return;
+        }
+        setState(() {
+          _paying = false;
+          _error = l10n.t('payment_confirming_hint');
+        });
+        return;
+      }
+
       await EkaadhToast.success(
         context,
         message: LocaleScope.of(context).t('payment_successful_short'),
@@ -285,7 +330,7 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    if (_event?.paymentSandbox == true) ...[
+                    if (_event?.paymentSandbox == true && _method == 'waafipay') ...[
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -348,10 +393,11 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
                           const SizedBox(height: 10),
                           Row(
                             children: [
-                              const Expanded(
+                              Expanded(
                                 child: _PrivatePayMethod(
-                                  selected: true,
-                                  child: Column(
+                                  selected: _method == 'waafipay',
+                                  onTap: () => setState(() => _method = 'waafipay'),
+                                  child: const Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       OperatorLogos(height: 18),
@@ -361,27 +407,26 @@ class _PrivateEventPayScreenState extends State<PrivateEventPayScreen> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: _PrivatePayMethod(
-                                  selected: false,
-                                  onTap: () {
-                                    EkaadhToast.error(context, message: l10n.t('edahab_unavailable'));
-                                  },
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Image.asset(
-                                        'assets/images/somtel-logo.png',
-                                        height: 22,
-                                        fit: BoxFit.contain,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      const Text('eDahab', style: TextStyle(fontWeight: FontWeight.w800)),
-                                    ],
+                              if (_event?.cardPaymentsEnabled == true) ...[
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _PrivatePayMethod(
+                                    selected: _method == 'waafipay_card',
+                                    onTap: () => setState(() => _method = 'waafipay_card'),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const CardNetworkLogos(height: 18),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          l10n.t('card_visa_mastercard'),
+                                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ),
+                              ],
                             ],
                           ),
                         ],

@@ -64,7 +64,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      final sent = await OtpService().send(
+      await OtpService().send(
         phone: PhoneNumberField.fullNumber(_phone.text),
         purpose: OtpService.purposeRegister,
       );
@@ -77,9 +77,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             phone: PhoneNumberField.fullNumber(_phone.text),
             purpose: OtpService.purposeRegister,
             alreadySent: true,
-            debugHint: sent.debugCode != null
-                ? '${l10n.t('testing_code')}: ${sent.debugCode}'
-                : null,
           ),
         ),
       );

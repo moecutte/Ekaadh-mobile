@@ -55,6 +55,7 @@ class PrivateEventModel {
   final List<PrivateEventTicketType> ticketTypes;
   final Map<String, dynamic>? pendingOrder;
   final bool paymentSandbox;
+  final bool cardPaymentsEnabled;
   final List<PrivateEventTestWallet> testWallets;
 
   const PrivateEventModel({
@@ -80,6 +81,7 @@ class PrivateEventModel {
     required this.ticketTypes,
     required this.pendingOrder,
     this.paymentSandbox = false,
+    this.cardPaymentsEnabled = false,
     this.testWallets = const [],
   });
 
@@ -129,6 +131,7 @@ class PrivateEventModel {
       ticketTypes: types,
       pendingOrder: _pendingOrderMap(json['pending_order']),
       paymentSandbox: json['payment_sandbox'] as bool? ?? false,
+      cardPaymentsEnabled: json['card_payments_enabled'] as bool? ?? false,
       testWallets: _parseTestWallets(json),
     );
   }
