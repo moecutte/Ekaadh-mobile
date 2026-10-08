@@ -43,6 +43,7 @@ class EventModel {
   final String? eventDay;
   final String? eventTimeLabel;
   final String? coverImage;
+  final String? coverImageMobile;
   final bool isFeatured;
   final bool isFree;
   final double? startingPrice;
@@ -66,6 +67,7 @@ class EventModel {
     required this.eventDay,
     required this.eventTimeLabel,
     required this.coverImage,
+    this.coverImageMobile,
     required this.isFeatured,
     required this.isFree,
     required this.startingPrice,
@@ -75,6 +77,9 @@ class EventModel {
     this.cardPaymentsEnabled = false,
     this.serviceFee = 1,
   });
+
+  /// Prefer mobile cover when present (app is always a mobile viewport).
+  String? get displayCover => coverImageMobile ?? coverImage;
 
   factory EventModel.fromJson(Map<String, dynamic> json) {
     final organizer = json['organizer'] as Map<String, dynamic>?;
@@ -99,6 +104,7 @@ class EventModel {
       eventDay: json['event_day'] as String?,
       eventTimeLabel: json['event_time_label'] as String?,
       coverImage: MediaUrl.resolve(json['cover_image'] as String?),
+      coverImageMobile: MediaUrl.resolve(json['cover_image_mobile'] as String?),
       isFeatured: json['is_featured'] as bool? ?? false,
       isFree: isFree,
       startingPrice: json['starting_price'] == null

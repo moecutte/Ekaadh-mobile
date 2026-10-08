@@ -121,7 +121,9 @@ class OrderModel {
       totalAmount: _asDouble(json['total_amount']),
       paymentMethod: json['payment_method'] as String?,
       eventTitle: event?['title'] as String?,
-      eventCover: MediaUrl.resolve(event?['cover_image'] as String?),
+      eventCover: MediaUrl.resolve(
+            (event?['cover_image_mobile'] as String?) ??
+                (event?['cover_image'] as String?)),
       eventDateLabel: event?['event_date_label'] as String?,
       eventTimeLabel: event?['event_time_label'] as String?,
       venue: event?['venue'] as String?,

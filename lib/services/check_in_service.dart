@@ -47,7 +47,9 @@ class StaffEventSummary {
       title: json['title'] as String,
       venue: json['venue'] as String?,
       city: json['city'] as String?,
-      coverImage: MediaUrl.resolve(json['cover_image'] as String?),
+      coverImage: MediaUrl.resolve(
+            (json['cover_image_mobile'] as String?) ??
+                (json['cover_image'] as String?)),
       eventDateLabel: json['event_date_label'] as String?,
       eventTimeLabel: json['event_time_label'] as String?,
       ticketsTotal: json['tickets_total'] as int? ?? 0,

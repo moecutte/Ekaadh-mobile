@@ -492,8 +492,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     child: SizedBox(
                       width: 72,
                       height: 72,
-                      child: event.coverImage != null
-                          ? DesignNetworkImage(url: event.coverImage)
+                      child: event.displayCover != null
+                          ? DesignNetworkImage(url: event.displayCover)
                           : const ColoredBox(color: Color(0xFFE2E8E4)),
                     ),
                   ),

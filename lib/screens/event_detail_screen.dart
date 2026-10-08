@@ -86,7 +86,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                         fit: StackFit.expand,
                         children: [
                           DesignNetworkImage(
-                            url: e.coverImage,
+                            url: e.displayCover,
                             fallbackColor: const Color(0xFFC8D8CF),
                           ),
                           const DecoratedBox(

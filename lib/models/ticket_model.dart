@@ -62,7 +62,9 @@ class TicketModel {
       publicUrl: json['public_url'] as String?,
       isUpcoming: json['is_upcoming'] as bool? ?? true,
       eventTitle: event?['title'] as String?,
-      eventCover: MediaUrl.resolve(event?['cover_image'] as String?),
+      eventCover: MediaUrl.resolve(
+            (event?['cover_image_mobile'] as String?) ??
+                (event?['cover_image'] as String?)),
       eventDateLabel: event?['event_date_label'] as String?,
       eventTimeLabel: event?['event_time_label'] as String?,
       venue: event?['venue'] as String?,

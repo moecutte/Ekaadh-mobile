@@ -442,7 +442,7 @@ class _EventCard extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   DesignNetworkImage(
-                    url: event.coverImage,
+                    url: event.displayCover,
                     fallbackColor: const Color(0xFFE2E8E4),
                   ),
                   Positioned(
@@ -589,7 +589,7 @@ class _FeaturedSliderState extends State<_FeaturedSlider> {
                       fit: StackFit.expand,
                       children: [
                         DesignNetworkImage(
-                          url: e.coverImage,
+                          url: e.displayCover,
                           fallbackColor: const Color(0xFFE2E8E4),
                         ),
                         const DecoratedBox(

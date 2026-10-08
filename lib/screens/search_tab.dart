@@ -908,7 +908,7 @@ class _SuggestedEventCard extends StatelessWidget {
                     width: 88,
                     height: 88,
                     child: DesignNetworkImage(
-                      url: event.coverImage,
+                      url: event.displayCover,
                       fallbackColor: const Color(0xFFE2E8E4),
                     ),
                   ),
@@ -1082,7 +1082,7 @@ class _ResultEventCard extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   DesignNetworkImage(
-                    url: event.coverImage,
+                    url: event.displayCover,
                     fallbackColor: const Color(0xFFE2E8E4),
                   ),
                   const DecoratedBox(
